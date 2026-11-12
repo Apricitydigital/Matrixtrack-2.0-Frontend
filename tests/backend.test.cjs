@@ -2285,7 +2285,8 @@ test('visible workspaces refresh reports and officer performance every 30 second
   fakeDocument.hidden=false;fakeDocument.dispatchEvent(new Event('visibilitychange'));assert.equal(updates,2);
   fakeWindow.dispatchEvent(new Event('focus'));assert.equal(updates,2,'focus and visibility events must not duplicate a refresh');
   now+=6000;fakeWindow.dispatchEvent(new Event('focus'));assert.equal(updates,3);
-  cleanup();assert.equal(timerCleared,true);now+=6000;fakeWindow.dispatchEvent(new Event('focus'));assert.equal(updates,3);
+  fakeWindow.dispatchEvent(new Event('matrixtrack:targets-changed'));assert.equal(updates,4,'a saved target refreshes immediately, inside the normal focus throttle');
+  cleanup();assert.equal(timerCleared,true);now+=6000;fakeWindow.dispatchEvent(new Event('focus'));fakeWindow.dispatchEvent(new Event('matrixtrack:targets-changed'));assert.equal(updates,4);
  }finally{React.useState=savedState;React.useEffect=savedEffect;global.window=savedWindow;global.document=savedDocument;Date.now=savedNow;}
 });
 
@@ -2399,6 +2400,24 @@ function reviewHookHarness(){
  React.useEffect=(effect,deps)=>{const at=index++,previous=slots[at];if(!previous||deps.some((dep,i)=>!Object.is(dep,previous.deps[i])))scheduled.push(()=>{previous?.cleanup?.();slots[at]={deps,cleanup:effect()};});};
  return {render:read=>{index=0;scheduled=[];const value=read();scheduled.forEach(run=>run());return value;},close:()=>{for(const slot of slots)slot?.cleanup?.();Object.assign(React,saved);}};
 }
+
+test('SI target reads the ULB saved percentage for the selected area and refreshes without a hardcoded 10%',async()=>{
+ const apiModule=require('../src/services/api.ts'),refresh=require('../src/services/useOperationalRefresh.ts');
+ const {SiReviewOverview}=require('../src/components/analytics/SiReviewOverview.tsx');
+ const {emptyCoverage}=require('../src/services/inspectionCoverage.ts');
+ const originalApi=apiModule.api,originalRefresh=refresh.useOperationalRefresh,jobs=[];let revision=0;
+ apiModule.api=(path,options)=>new Promise(resolve=>jobs.push({path,options,resolve}));refresh.useOperationalRefresh=()=>revision;
+ const data={...emptyCoverage(),modules:['toilets'],visits:Array.from({length:47},(_,i)=>({id:`r${i}`,module:'toilets',zoneId:'z',wardId:'w',status:'SUBMITTED',submittedAt:'2026-11-12T04:00:00Z'}))};
+ const harness=reviewHookHarness(),props={cityId:'city',data,loading:false,zoneIds:['z'],wardIds:['w'],onPending:()=>{}},read=()=>SiReviewOverview(props),flush=()=>new Promise(setImmediate);
+ const target=tree=>{const children=tree?.props?.children;for(const node of Array.isArray(children)?children:[children]){if(!node||typeof node!=='object')continue;if(node.type==='button'){const parts=node.props.children;if(Array.isArray(parts)&&parts[0]?.props?.children?.[0]==='SI target')return parts[1].props.children;}const found=target(node);if(found!==undefined)return found;}};
+ try{
+  harness.render(read);assert.equal(jobs.length,1);assert.match(jobs[0].path,/role=QC&zoneIds=z&wardIds=w/);assert.equal(jobs[0].options.cache,'no-store');
+  jobs[0].resolve({targets:0,percentTargets:0,percents:[],defaultPercent:10});await flush();assert.equal(target(harness.render(read)),'5');
+  revision++;harness.render(read);jobs[1].resolve({targets:3,percentTargets:3,percents:[20],defaultPercent:10});await flush();assert.equal(target(harness.render(read)),'10');
+  revision++;harness.render(read);jobs[2].resolve({targets:3,percentTargets:3,percents:[50],defaultPercent:10});await flush();assert.equal(target(harness.render(read)),'24');
+  props.wardIds=['other'];harness.render(read);assert.equal(jobs.length,4);assert.match(jobs[3].path,/wardIds=other/);
+ }finally{harness.close();apiModule.api=originalApi;refresh.useOperationalRefresh=originalRefresh;}
+});
 
 test('slow background coverage refresh keeps figures, blocks overlap and identifies stale figures after failure',async()=>{
  const coverage=require('../src/services/inspectionCoverage.ts'),refresh=require('../src/services/useOperationalRefresh.ts'),{useInspectionCoverage}=require('../src/services/useInspectionCoverage.ts');

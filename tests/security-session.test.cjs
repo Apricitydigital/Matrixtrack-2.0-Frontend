@@ -11,6 +11,17 @@ const jwt = exp => `header.${Buffer.from(JSON.stringify({exp})).toString('base64
 const json = (value,status=200) => new Response(JSON.stringify(value),{status});
 beforeEach(()=>{clearToken();values.clear();});
 
+test('successful ULB target writes notify live dashboards; reads and rejected writes do not',async()=>{
+ let updates=0;const updated=()=>updates++;window.addEventListener('matrixtrack:targets-changed',updated);
+ try{
+  global.fetch=async()=>json({updated:1,created:0});
+  await api('/city/targets/percent-scope',{method:'POST',body:JSON.stringify({role:'QC',percent:20,zoneIds:[],wardIds:[]})});assert.equal(updates,1);
+  await api('/city/targets/percent-scope?role=QC',{cache:'no-store'});assert.equal(updates,1);
+  global.fetch=async()=>json({error:'Not allowed'},403);
+  await assert.rejects(api('/city/targets/percent-scope',{method:'POST',body:'{}'}));assert.equal(updates,1);
+ }finally{window.removeEventListener('matrixtrack:targets-changed',updated);}
+});
+
 test('Connection failures show English guidance without internal URLs or raw fetch errors',async()=>{
   global.fetch=async()=>{throw new TypeError('Failed to fetch http://localhost:4000');};
   await assert.rejects(api('/auth/login',{method:'POST',body:'{}'}),error=>{

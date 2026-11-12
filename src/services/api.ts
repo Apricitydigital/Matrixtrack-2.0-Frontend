@@ -1,5 +1,6 @@
 // Database credentials belong to the existing backend, never to the browser application.
 import {cachedRead,clearReadCache,primeReadCache,readCacheKey,readCacheTtl} from './readCache';
+import {TARGETS_CHANGED_EVENT} from './targetEvents';
 import {applyFixedWardWeights} from './wardScoring';
 export {clearReadCache};
 export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || '/backend').replace(/\/+$/, '');
@@ -86,7 +87,10 @@ async function request<T = any>(path: string, init: RequestInit = {}): Promise<T
     throw new ApiError(response.status, body?.error || body?.message || `Request failed (${response.status})`);
   }
   if (raw && body === null) throw new ApiError(502, 'Backend returned an invalid JSON response. Check the API URL.');
-  if(init.method&&!['GET','HEAD'].includes(init.method.toUpperCase()))clearReadCache();
+  if(init.method&&!['GET','HEAD'].includes(init.method.toUpperCase())){
+    clearReadCache();
+    if(/^\/city\/targets(?:\/|\?|$)/.test(path)&&typeof window!=='undefined')window.dispatchEvent(new Event(TARGETS_CHANGED_EVENT));
+  }
   return (path.split('?')[0]==='/ward-ranking'&&body ? applyFixedWardWeights(body,cityModules.get(headers.get('x-city-id')||body.cityId||cityContext||'')) : body) as T;
 }
 

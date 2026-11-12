@@ -153,7 +153,7 @@ test('SI automatic 10% is rounded once per day across modules and includes post-
  const summary=siReviewSummary(data,10);assert.deepEqual(summary,{received:7,reviewed:4,pending:3,other:0,target:1,days:1});
  const {SiReviewOverview}=require('../src/components/analytics/SiReviewOverview.tsx');
  const html=renderToStaticMarkup(React.createElement(SiReviewOverview,{cityId:'c',data,loading:false,rule:{targets:0,percentTargets:0,percents:[],defaultPercent:10},onPending:()=>{}}));
- assert.match(html,/Automatic 10% daily review sample/);assert.match(html,/SI sample target \(10%\)/);assert.doesNotMatch(html,/not set|whole city only/);
+ assert.match(html,/Default 10% daily review target/);assert.match(html,/SI target \(10%\)/);assert.doesNotMatch(html,/not set|whole city only/);
  assert.equal(siReviewSummary({...data,visits:data.visits.map(v=>({...v,submittedAt:undefined}))},10).target,null);
  assert.equal(siReviewSummary({...data,failedModules:['sweeping']},10).received,null);
  assert.equal(siReviewPercent({targets:2,percentTargets:2,percents:[10,20]}),null);
