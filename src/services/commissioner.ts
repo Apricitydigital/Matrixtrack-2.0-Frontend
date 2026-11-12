@@ -12,7 +12,7 @@ import type { OperationalModuleId } from '../types';
 import { aggregateTargetState, verifyTargetFigures, type TargetEvidence, type TargetConfiguration } from './targetConfiguration';
 export interface BriefingNotice {id:string;title:string;detail:string;count:number;tone:'red'|'yellow';page:string;}
 export const INSPECTION_KEYS=['target','completed','pending','cleaned','notCleaned','siPending','actionRequired','actionPending','actionTaken'] as const;
-export type InspectionFigures=Record<typeof INSPECTION_KEYS[number],number>&{targetPercent?:number}&TargetEvidence;
+export type InspectionFigures=Record<typeof INSPECTION_KEYS[number],number>&{targetPercent?:number;targetBasis?:'current'|'historical'}&TargetEvidence;
 const emptyFigures=():InspectionFigures=>({target:0,completed:0,pending:0,cleaned:0,notCleaned:0,siPending:0,actionRequired:0,actionPending:0,actionTaken:0});
 export function summarizeZones(data:any) {
   const totals=emptyFigures(),modules:Partial<Record<OperationalModuleId,InspectionFigures>>={};
@@ -59,7 +59,8 @@ export function applyPerformanceTargets(official:ReturnType<typeof summarizeZone
     const target=scope.reduce((n,row)=>n+row.target,0),completed=scope.reduce((n,row)=>n+row.credit,0);
     const percentages=scope.map(row=>row.source==='ADMIN'?row.targetPercent:null);
     const percentage=percentages.every(value=>typeof value==='number'&&value>=1&&value<=100&&value===percentages[0])?percentages[0]:undefined;
-    return {...figures,target,completed,pending:Math.max(0,target-completed),targetState:'configured' as const,targetPercent:percentage};
+    const targetBasis=scope.every(row=>row.targetBasis==='current')?'current' as const:'historical' as const;
+    return {...figures,target,completed,pending:Math.max(0,target-completed),targetState:'configured' as const,targetPercent:percentage,targetBasis};
   };
   return {...official,totals:resolve(official.totals,selected),modules:Object.fromEntries(Object.entries(official.modules).map(([id,value])=>[id,resolve(value,selected.filter(row=>moduleId(row.module)===id))])),zones:official.zones.map(zone=>({...zone,totals:resolve(zone.totals,selected.filter(row=>row.zoneName===zone.name))}))};
 }

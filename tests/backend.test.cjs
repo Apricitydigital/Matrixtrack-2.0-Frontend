@@ -14,6 +14,25 @@ const { api, pages, getToken, setToken } = require('../src/services/api.ts');
 const { matrixStore } = require('../src/services/store.ts');
 const { mapReport, mapCity } = require('../src/services/adapters.ts');
 const profile = { id: 'user-a', role: 'CITY_ADMIN', name: 'Test Administrator', email: 'admin@example.test', cityId: 'city-a' };
+
+test('current target comparison preserves report intake and labels the full selected period',()=>{
+ const {summarizeZones,applyPerformanceTargets}=require('../src/services/commissioner.ts');
+ const {targetDelivery,reportTargetDelivery}=require('../src/services/targetDelivery.ts');
+ const {InspectionTargetProgress}=require('../src/components/analytics/InspectionTargetProgress.tsx');
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const official=summarizeZones({zones:[{zoneId:'z',zoneName:'Zone 1',modules:[{module:'SWEEPING',target:1000,completed:5}]}]});
+ const row={wardId:'w',module:'SWEEPING',zoneName:'Zone 1',source:'ADMIN',targetPercent:20,targetBasis:'current',target:651,credit:4};
+ const figures=applyPerformanceTargets(official,{u:{rows:[row]}},['w']).totals;
+ const delivery=targetDelivery(figures);assert.equal(delivery.configuredPercent,20);assert.equal(delivery.targetBasis,'current');
+ const received=2697,progress=reportTargetDelivery(delivery,received);
+ assert.equal(progress.completed,received);assert.equal(progress.remaining,0);assert.equal(progress.percent,received/651*100);
+ const html=renderToStaticMarkup(React.createElement(InspectionTargetProgress,{from:'2026-08-05',to:'2026-11-05',delivery,received,loading:false,onInspect:()=>{}}));
+ assert.match(html,/Current 20% daily target applied to all 93 selected days/);assert.match(html,/2,697/);
+ const mixed=applyPerformanceTargets(official,{u:{rows:[row,{...row,wardId:'w2',targetPercent:null,targetBasis:'historical'}]}}).totals;
+ assert.equal(mixed.targetPercent,undefined);assert.equal(mixed.targetBasis,'historical');
+ const legacy=targetDelivery(applyPerformanceTargets(official,{u:{rows:[{...row,targetBasis:undefined}]}}).totals);
+ assert.equal(legacy.targetBasis,'historical');
+});
 test('all report evidence formats map screen warnings and render the saved confidence',()=>{
   const {renderToStaticMarkup}=require('react-dom/server');
   const React=require('react');
