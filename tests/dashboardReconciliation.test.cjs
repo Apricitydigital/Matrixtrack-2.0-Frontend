@@ -51,3 +51,22 @@ test('SI uses IST submission days and no duplicate reports or Drafts',()=>{
  const sample={...data,visits:[data.visits[0],data.visits[0],{...data.visits[0],id:'next',submittedAt:'2026-11-05T19:00:00Z'},{...data.visits[0],id:'draft',status:'DRAFT'}]};
  assert.equal(siReviewSummary(sample,10).target,2);assert.equal(siReviewSummary(sample,10).received,2);
 });
+
+test('compact dashboard hydrates only the exact clicked report module and IST day',async()=>{
+ const coverage=require('../src/services/inspectionCoverage.ts'),saved=coverage.loadInspectionCoverage,{coverageReportDetail}=require('../src/services/coverageReportDetail.ts');
+ const clicked={...data.visits[0],id:'sweeping:clicked',submittedAt:'2026-11-05T19:00:00Z'},raw={id:'clicked',cityId:'city',photos:[{url:'evidence.jpg'}]},requests=[];
+ coverage.loadInspectionCoverage=async(...args)=>{requests.push(args);return {...emptyCoverage(),visits:[{...clicked,id:'sweeping:other',raw:{id:'other'}},{...clicked,raw}]}};
+ try{
+  const signal=new AbortController().signal,result=await coverageReportDetail({id:'city'},{...data,compact:true},clicked,signal);
+  assert.equal(result,raw);assert.deepEqual(requests[0].slice(0,3),[{id:'city',enabledModules:['sweeping']},'2026-11-06','2026-11-06']);assert.equal(requests[0][3],signal);assert.equal(requests[0][4],false);
+  assert.equal(await coverageReportDetail({id:'city'},data,{...clicked,raw},signal),raw);assert.equal(requests.length,1);
+  coverage.loadInspectionCoverage=async()=>({...emptyCoverage(),visits:[{...clicked,id:'sweeping:other',raw:{id:'other'}}]});
+  await assert.rejects(coverageReportDetail({id:'city'},{...data,compact:true},clicked,signal),/unavailable/);
+ }finally{coverage.loadInspectionCoverage=saved;}
+});
+
+test('compact overview retains completed corrective actions after the current status changes',async()=>{
+ const api=require('../src/services/api.ts'),saved=api.api,coverage=require('../src/services/inspectionCoverage.ts');
+ api.api=async()=>({...emptyCoverage(),version:1,complete:true,cityId:'city',from:'2026-11-05',to:'2026-11-05',inventoryAvailable:true,modules:['sweeping'],visits:[{id:'sweeping:r',module:'sweeping',zoneId:'z1',wardId:'w1',status:'APPROVED',submittedAt:'2026-11-05T04:00:00Z',raw:{status:'APPROVED',payload:{actionTakenAt:'2026-11-05T05:00:00Z'}}}]});
+ try{const result=await coverage.loadInspectionCoverage({id:'city',enabledModules:['sweeping']},'2026-11-05','2026-11-05',new AbortController().signal,true);assert.equal(result.visits[0].actionRequired,true);assert.equal(result.visits[0].actionTaken,true);assert.equal(ulbScopeData(result).actionTakenTotal,1);}finally{api.api=saved;}
+});

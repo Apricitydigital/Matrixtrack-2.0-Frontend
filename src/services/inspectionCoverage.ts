@@ -40,7 +40,7 @@ export async function loadInspectionCoverage(city: Pick<City,'id'|'enabledModule
         const data=await api(`/city/dashboard/inspection-coverage?${new URLSearchParams({from,to,modules:city.enabledModules.join(',')})}`,{signal:sharedSignal,cache:'no-store'});
         if(data?.version!==1||data.complete!==true||data.cityId!==city.id||data.from!==from||data.to!==to||!Array.isArray(data.assets)||!Array.isArray(data.visits)||!Array.isArray(data.modules)||!Array.isArray(data.failedModules)||!Array.isArray(data.errors)||typeof data.inventoryAvailable!=='boolean'||city.enabledModules.some(m=>!data.modules.includes(m)))throw Error('Compact inspection register is incomplete or has the wrong scope.');
         if(data.visits.some((v:any)=>!v.id||!city.enabledModules.includes(v.module)||!v.submittedAt)||data.assets.some((a:any)=>!a.id||!city.enabledModules.includes(a.module)))throw Error('Compact inspection register is missing required identifiers.');
-        return {...data,compact:true} as InspectionCoverage;
+        return {...data,visits:data.visits.map((visit:InspectionVisit)=>{const lifecycle=actionLifecycle(visit.raw);return {...visit,actionRequired:lifecycle.required,actionTaken:lifecycle.taken};}),compact:true} as InspectionCoverage;
       }catch(error){
         // Old backends and scoped field roles retain their existing authorized reader.
         if(!(error instanceof ApiError)||![403,404].includes(error.status))throw error;
