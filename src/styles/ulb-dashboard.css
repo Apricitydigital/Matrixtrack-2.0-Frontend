@@ -13,6 +13,9 @@
 .dashboard-multi-scope .ops-multi-menu li label:hover{background:var(--surface-soft)}
 .dashboard-multi-scope .ops-multi-actions button{color:var(--accent)}
 .dashboard-multi-scope .ops-multi-actions button:disabled{color:var(--muted);opacity:.6}
+.dashboard-multi-scope .ops-multi-preset{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:10px 12px;border-bottom:1px solid var(--line);font-size:13px;text-align:left;color:var(--accent);background:var(--surface-soft);cursor:pointer}
+.dashboard-multi-scope .ops-multi-preset:hover,.dashboard-multi-scope .ops-multi-preset[aria-pressed=true]{background:var(--surface-soft);font-weight:600}
+.dashboard-multi-scope .ops-multi-preset:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .dashboard-multi-scope .ops-multi-trigger:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(max-width:600px){.commissioner-home .dashboard-multi-scope>div{width:100%}.dashboard-multi-scope .ops-multi{flex:1 1 150px;width:auto}.dashboard-multi-scope>div>svg{display:none}}
 
@@ -32,3 +35,6 @@
 .ulb-followup-tile>button:disabled{opacity:1}
 
 .ulb-si-body>.ulb-target-explanation{margin:14px 0 0;padding-top:12px;border-top:1px solid var(--line,#dce6ee);color:var(--muted,#637f91);font-size:13px}
+
+.ulb-detail-register>.ops-filter-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media(max-width:640px){.ulb-detail-register>.ops-filter-grid{grid-template-columns:1fr}}

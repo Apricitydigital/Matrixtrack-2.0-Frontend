@@ -11,6 +11,32 @@ const jwt = exp => `header.${Buffer.from(JSON.stringify({exp})).toString('base64
 const json = (value,status=200) => new Response(JSON.stringify(value),{status});
 beforeEach(()=>{clearToken();values.clear();});
 
+test('successful ULB target writes notify live dashboards; reads and rejected writes do not',async()=>{
+ let updates=0;const updated=()=>updates++;window.addEventListener('matrixtrack:targets-changed',updated);
+ try{
+  global.fetch=async()=>json({updated:1,created:0});
+  await api('/city/targets/percent-scope',{method:'POST',body:JSON.stringify({role:'QC',percent:20,zoneIds:[],wardIds:[]})});assert.equal(updates,1);
+  await api('/city/targets/percent-scope?role=QC',{cache:'no-store'});assert.equal(updates,1);
+  global.fetch=async()=>json({error:'Not allowed'},403);
+  await assert.rejects(api('/city/targets/percent-scope',{method:'POST',body:'{}'}));assert.equal(updates,1);
+ }finally{window.removeEventListener('matrixtrack:targets-changed',updated);}
+});
+
+test('Connection failures show English guidance without internal URLs or raw fetch errors',async()=>{
+  global.fetch=async()=>{throw new TypeError('Failed to fetch http://localhost:4000');};
+  await assert.rejects(api('/auth/login',{method:'POST',body:'{}'}),error=>{
+    assert.equal(error.status,0);
+    assert.equal(error.message,'Unable to connect to the service. Please check your connection and try again. If the problem continues, contact your administrator.');
+    return true;
+  });
+});
+
+test('Cancelled requests retain their cancellation reason',async()=>{
+  const controller=new AbortController(),reason=new Error('Navigation cancelled this request');controller.abort(reason);
+  global.fetch=async()=>{throw new TypeError('Failed to fetch');};
+  await assert.rejects(api('/auth/login',{signal:controller.signal}),error=>error===reason);
+});
+
 test('Concurrent browser requests refresh once and use the new access token',async()=>{
   const expired=jwt(1),fresh=jwt(Math.floor(Date.now()/1000)+1800);setToken(expired);setRefreshToken('original-refresh');
   const version=getSessionVersion();let renewals=0,protectedReads=0;

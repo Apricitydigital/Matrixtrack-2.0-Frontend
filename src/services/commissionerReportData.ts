@@ -3,6 +3,7 @@ import type { City, User, Ward, Zone, OperationalModuleId } from '../types';
 import type { CityPulse } from './commissioner';
 import { inspectionStatus } from './inspectionCoverage';
 import type { InspectionCoverage } from './inspectionCoverage';
+import {reportTargetDelivery} from './targetDelivery';
 import { inspectionMetrics } from './inspectionMetrics';
 import { computeUnitTotals } from './plantAnalytics';
 import { personnelScope } from './personnel';
@@ -57,7 +58,7 @@ export function commissionerReportData(input:ReportDataInput):{facts:ReportFact[
   add(deployment,'achieved','Achieved: inspections completed',metrics.achieved,'Complete inspection register','All non-Draft field inspections, including Pending review.');
   add(deployment,'target','Inspection target',metrics.delivery.target,'Same target source as dashboard',metrics.delivery.fallback?'No configured target confirmed: assumes one completed visit per registered asset per selected day.':'Configured target returned by the source.');
   add(deployment,'targetCredits','Inspections credited toward target',metrics.delivery.completed,'Same target credit source as dashboard','Distinct registered asset/day visits for the planning assumption; configured targets use backend credit. Can differ from total completed inspections.');
-  add(deployment,'targetAchievement','Inspection target achievement %',metrics.delivery.percent,'Target credits / inspection target','Not unique asset coverage.');
+  add(deployment,'targetAchievement','Report target progress %',reportTargetDelivery(metrics.delivery,metrics.achieved).percent,'Submitted reports / inspection target','Drafts excluded; matches the inspection target card. Officer scoring credit is separate.');
   add(deployment,'records','Total inspection records',metrics.totalRecords,'Complete inspection register','All statuses, including Draft; reconciles to status cards.');
   add(deployment,'unique','Unique registered assets inspected',metrics.uniqueEntities,'Complete inspection register + current inventory','Completed visits only; each asset counted once across all selected dates.');
   add(deployment,'coverage','Asset coverage %',metrics.coveragePercent,'Unique assets inspected / total mapped assets','Not the inspection target achievement percentage.');

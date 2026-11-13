@@ -29,7 +29,7 @@ test('the ULB operations dashboard renders intelligence counts alongside the off
  const originalCoverage=coverageHook.useInspectionCoverage,originalPulse=commissioner.useCityPulse;
  const {inspectionVisit}=require('../src/services/inspectionCoverage');
  const records=Array.from({length:100},(_,i)=>raw(String(i),i<6?'APPROVED':i<10?'REJECTED':'SUBMITTED',i%2?'CLEAN':'NOT_CLEAN'));
- const data={from:'2026-11-04',to:'2026-11-04',assets:[],visits:records.map(record=>inspectionVisit(record,'sweeping','city')),modules:['sweeping'],failedModules:[],inventoryAvailable:true,errors:[]};
+ const data={from:'2026-11-04',to:'2026-11-04',assets:[],visits:records.map(record=>inspectionVisit({...record,beatId:`beat-${record.id}`,zoneId:'z',wardId:'w'},'sweeping','city')),modules:['sweeping'],failedModules:[],inventoryAvailable:true,errors:[]};
  coverageHook.useInspectionCoverage=()=>({data,loading:false});
  commissioner.useCityPulse=()=>({pending:0,errors:{},performance:{}});
  try {

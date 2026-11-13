@@ -8,7 +8,7 @@ import { MODULE_KEYS } from './adapters';
 import { mapAssets, type MapAsset } from './operationsMap';
 import type { City, OperationalModuleId, Zone } from '../types';
 
-export interface InspectionVisit { id: string; module: OperationalModuleId; assetId?: string; zoneId: string; wardId: string; status?: string; submittedAt?:string; actionRequired?:boolean; actionTaken?:boolean; raw?:any; }
+export interface InspectionVisit { id: string; module: OperationalModuleId; assetId?: string; zoneId: string; wardId: string; status?: string; submittedAt?:string; actionRequired?:boolean; actionTaken?:boolean; raw?:any; sourceReportIds?:string[]; }
 export interface CoverageCounts {
   total: number | null; inspections: number | null; unique: number | null;
   repeats: number | null; repeatedLocations: number | null; covered: number | null;
@@ -20,6 +20,13 @@ export interface InspectionCoverage {
   failedModules: OperationalModuleId[]; inventoryAvailable: boolean; errors: string[];
 }
 export const emptyCoverage = (): InspectionCoverage => ({assets:[],visits:[],modules:[],failedModules:[],inventoryAvailable:false,errors:[]});
+
+/** Empty module selection means all authorized modules in this register. */
+export function selectInspectionModules(data:InspectionCoverage,moduleIds:string[]):InspectionCoverage {
+  if(!moduleIds.length)return data;
+  const keep=(row:{module:string})=>moduleIds.includes(row.module);
+  return {...data,assets:data.assets.filter(keep),visits:data.visits.filter(keep),modules:data.modules.filter(m=>moduleIds.includes(m)),failedModules:data.failedModules.filter(m=>moduleIds.includes(m))};
+}
 
 export function inspectionVisit(raw: any, module: OperationalModuleId, cityId: string): InspectionVisit | null {
   if (raw.type === 'BIN_REGISTRATION' || raw.cityId && raw.cityId !== cityId) return null;
@@ -40,7 +47,7 @@ export async function loadInspectionCoverage(city: Pick<City,'id'|'enabledModule
         const data=await api(`/city/dashboard/inspection-coverage?${new URLSearchParams({from,to,modules:city.enabledModules.join(',')})}`,{signal:sharedSignal,cache:'no-store'});
         if(data?.version!==1||data.complete!==true||data.cityId!==city.id||data.from!==from||data.to!==to||!Array.isArray(data.assets)||!Array.isArray(data.visits)||!Array.isArray(data.modules)||!Array.isArray(data.failedModules)||!Array.isArray(data.errors)||typeof data.inventoryAvailable!=='boolean'||city.enabledModules.some(m=>!data.modules.includes(m)))throw Error('Compact inspection register is incomplete or has the wrong scope.');
         if(data.visits.some((v:any)=>!v.id||!city.enabledModules.includes(v.module)||!v.submittedAt)||data.assets.some((a:any)=>!a.id||!city.enabledModules.includes(a.module)))throw Error('Compact inspection register is missing required identifiers.');
-        return {...data,compact:true} as InspectionCoverage;
+        return {...data,visits:data.visits.map((visit:InspectionVisit)=>{const lifecycle=actionLifecycle(visit.raw);return {...visit,actionRequired:lifecycle.required,actionTaken:lifecycle.taken};}),compact:true} as InspectionCoverage;
       }catch(error){
         // Old backends and scoped field roles retain their existing authorized reader.
         if(!(error instanceof ApiError)||![403,404].includes(error.status))throw error;

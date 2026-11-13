@@ -1,5 +1,5 @@
 import {matrixStore} from './store';
-export const REPORT_BRAND='Powered by Apricty Digital Labs';
+export const REPORT_BRAND='Powered by Apricity Digital Labs';
 export function exportContext(filename='',note='') {
  const dates=(filename+' '+note).match(/\d{4}-\d{2}-\d{2}/g)||[],range=matrixStore.getDateRange();
  const from=dates[0]||range.from,to=dates[1]||dates[0]||range.to;

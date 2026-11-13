@@ -1,3 +1,4 @@
+import {ulbReportRegister} from '../../services/ulbReportRegister';
 import {IntelligenceSummary,IntelligenceSuggestion} from '../../components/reports/IntelligenceSuggestion';
 import { PhotoIntegrityWarning } from '../../components/reports/PhotoIntegrityWarning';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -36,7 +37,8 @@ export function CommissionerWorkspace({city,reports,zones,wards,users,onSelectRe
   const [photo,setPhoto]=useState<OperationalReport|null>(null);
   const range=matrixStore.getDateRange();
   const completeRegister=['COMMISSIONER','ULB_OFFICER'].includes(role);
-  const coverage=useInspectionCoverage(city,range.from,range.to,matrixStore.loadRevision+retry,completeRegister);
+  const rawCoverage=useInspectionCoverage(city,range.from,range.to,matrixStore.loadRevision+retry,completeRegister);
+  const coverage=useMemo(()=>({...rawCoverage,data:completeRegister?ulbReportRegister(rawCoverage.data):rawCoverage.data}),[rawCoverage.data,rawCoverage.loading,completeRegister]);
   const register=useMemo(()=>completeRegister?wardInspectionRows(coverage.data,city.id,undefined,zones,wards):reports,[completeRegister,coverage.data,city.id,zones,wards,reports]);
   useEffect(()=>{setFilters({...emptyFilters(),...initialFilters});},[city.id,JSON.stringify(initialFilters)]);
   useEffect(()=>{if(matrixStore.getCollection('users').status==='idle')void matrixStore.loadCollection('users');},[city.id,matrixStore.loadRevision]);

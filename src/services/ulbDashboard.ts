@@ -1,10 +1,11 @@
 import { actionLifecycle } from './actionLifecycle';
 import type {InspectionCoverage,InspectionVisit} from './inspectionCoverage';
 import {coverageCounts,inspectionStatus} from './inspectionCoverage';
+import type {OperationalModuleId} from '../types';
 export type UlbDrill='all'|'inspections_completed'|'approved'|'rejected'|'pending_review'|'action_required'|'action_pending'|'action_taken'|'repeats'|'not_inspected'|'unclassified'|'escalated';
-export interface UlbScope {zone?:string;ward?:string;zoneIds?:string[];wardIds?:string[]}
-export function matchesUlbScope(row:{zoneId:string;wardId:string},scope:UlbScope={}) {
-  return (!scope.zone||row.zoneId===scope.zone)&&(!scope.ward||row.wardId===scope.ward)&&(!scope.zoneIds?.length||scope.zoneIds.includes(row.zoneId))&&(!scope.wardIds?.length||scope.wardIds.includes(row.wardId));
+export interface UlbScope {zone?:string;ward?:string;zoneIds?:string[];wardIds?:string[];module?:OperationalModuleId}
+export function matchesUlbScope(row:{zoneId:string;wardId:string;module?:OperationalModuleId},scope:UlbScope={}) {
+  return (!scope.module||!row.module||row.module===scope.module)&&(!scope.zone||row.zoneId===scope.zone)&&(!scope.ward||row.wardId===scope.ward)&&(!scope.zoneIds?.length||scope.zoneIds.includes(row.zoneId))&&(!scope.wardIds?.length||scope.wardIds.includes(row.wardId));
 }
 /** Retain only wards belonging to a selected zone; empty zones means all zones. */
 export function ulbSelectedWards(selected:string[],zoneIds:string[],wards:{id:string;zoneId:string}[]) {

@@ -14,6 +14,25 @@ const { api, pages, getToken, setToken } = require('../src/services/api.ts');
 const { matrixStore } = require('../src/services/store.ts');
 const { mapReport, mapCity } = require('../src/services/adapters.ts');
 const profile = { id: 'user-a', role: 'CITY_ADMIN', name: 'Test Administrator', email: 'admin@example.test', cityId: 'city-a' };
+
+test('current target comparison preserves report intake and labels the full selected period',()=>{
+ const {summarizeZones,applyPerformanceTargets}=require('../src/services/commissioner.ts');
+ const {targetDelivery,reportTargetDelivery}=require('../src/services/targetDelivery.ts');
+ const {InspectionTargetProgress}=require('../src/components/analytics/InspectionTargetProgress.tsx');
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const official=summarizeZones({zones:[{zoneId:'z',zoneName:'Zone 1',modules:[{module:'SWEEPING',target:1000,completed:5}]}]});
+ const row={wardId:'w',module:'SWEEPING',zoneName:'Zone 1',source:'ADMIN',targetPercent:20,targetBasis:'current',target:651,credit:4};
+ const figures=applyPerformanceTargets(official,{u:{rows:[row]}},['w']).totals;
+ const delivery=targetDelivery(figures);assert.equal(delivery.configuredPercent,20);assert.equal(delivery.targetBasis,'current');
+ const received=2697,progress=reportTargetDelivery(delivery,received);
+ assert.equal(progress.completed,received);assert.equal(progress.remaining,0);assert.equal(progress.percent,received/651*100);
+ const html=renderToStaticMarkup(React.createElement(InspectionTargetProgress,{from:'2026-08-05',to:'2026-11-05',delivery,received,loading:false,onInspect:()=>{}}));
+ assert.match(html,/Current 20% daily target applied to all 93 selected days/);assert.match(html,/2,697/);
+ const mixed=applyPerformanceTargets(official,{u:{rows:[row,{...row,wardId:'w2',targetPercent:null,targetBasis:'historical'}]}}).totals;
+ assert.equal(mixed.targetPercent,undefined);assert.equal(mixed.targetBasis,'historical');
+ const legacy=targetDelivery(applyPerformanceTargets(official,{u:{rows:[{...row,targetBasis:undefined}]}}).totals);
+ assert.equal(legacy.targetBasis,'historical');
+});
 test('all report evidence formats map screen warnings and render the saved confidence',()=>{
   const {renderToStaticMarkup}=require('react-dom/server');
   const React=require('react');
@@ -90,16 +109,16 @@ test('frontend role names retain backend role identifiers',()=>{
   assert.equal(ROLE_LABELS[key],label);assert.equal(PERSONNEL_ROLES[key],label);
  }
 });
-test('report exports carry dates and Apricty branding while preserving numeric data and import templates',async()=>{
+test('report exports carry dates and Apricity branding while preserving numeric data and import templates',async()=>{
  const {downloadWorkbook,downloadAuditWorkbook}=require('../src/services/spreadsheets.ts'),{downloadCsv,parseCsv}=require('../src/services/csv.ts'),{Workbook}=require('exceljs');
  const originalDocument=global.document,originalCreate=URL.createObjectURL;let blob,filename;
  global.document={createElement:()=>({setAttribute(k,v){this[k]=v;},click(){filename=this.download;}}),body:{appendChild(){},removeChild(){}}};URL.createObjectURL=value=>{blob=value;return originalCreate(value);};
  try{
   await downloadWorkbook('service-report-2026-08-01-to-2026-11-03.xlsx',['Asset','Completed'],[['Beat 1',12]],'Services');
-  const workbook=new Workbook();await workbook.xlsx.load(await blob.arrayBuffer());assert.equal(filename,'service-report-2026-08-01-to-2026-11-03.xlsx');assert.equal(workbook.worksheets[0].name,'Report overview');assert.match(workbook.getWorksheet('Report overview').getCell('B3').text,/2026-08-01 to 2026-11-03/);assert.equal(workbook.getWorksheet('Report overview').getCell('B6').text,'Apricty Digital Labs');assert.equal(workbook.getWorksheet('Services').getCell('B2').value,12);assert.match(workbook.getWorksheet('Services').headerFooter.oddFooter,/Powered by Apricty Digital Labs/);
+  const workbook=new Workbook();await workbook.xlsx.load(await blob.arrayBuffer());assert.equal(filename,'service-report-2026-08-01-to-2026-11-03.xlsx');assert.equal(workbook.worksheets[0].name,'Report overview');assert.match(workbook.getWorksheet('Report overview').getCell('B3').text,/2026-08-01 to 2026-11-03/);assert.equal(workbook.getWorksheet('Report overview').getCell('B6').text,'Apricity Digital Labs');assert.equal(workbook.getWorksheet('Services').getCell('B2').value,12);assert.match(workbook.getWorksheet('Services').headerFooter.oddFooter,/Powered by Apricity Digital Labs/);
   await downloadWorkbook('toilets-template.xlsx',['Zone Name','Ward Name'],[],'Locations');const template=new Workbook();await template.xlsx.load(await blob.arrayBuffer());assert.equal(template.worksheets.length,1);assert.equal(template.worksheets[0].getCell('A1').text,'Zone Name');
   await downloadAuditWorkbook('full-report-2026-08-01-to-2026-11-03.xlsx',[{name:'Records',headers:['Metric','Value'],rows:[['Missing',null],['Completed',12]]}]);const audit=new Workbook();await audit.xlsx.load(await blob.arrayBuffer());assert.equal(audit.getWorksheet('Records').getCell('B2').text,'Not available');assert.equal(audit.getWorksheet('Records').getCell('B3').value,12);
-  downloadCsv('service-report-2026-08-01-to-2026-11-03.csv','Module,Count\r\nSweeping,12');const csv=parseCsv(await blob.text());assert.equal(csv[1][1],'12');assert.ok(csv[0].includes('Powered by Apricty Digital Labs'));assert.ok(csv[1].includes('2026-08-01'));assert.ok(csv[1].includes('2026-11-03'));
+  downloadCsv('service-report-2026-08-01-to-2026-11-03.csv','Module,Count\r\nSweeping,12');const csv=parseCsv(await blob.text());assert.equal(csv[1][1],'12');assert.ok(csv[0].includes('Powered by Apricity Digital Labs'));assert.ok(csv[1].includes('2026-08-01'));assert.ok(csv[1].includes('2026-11-03'));
   downloadCsv('import-template.csv','Zone,Ward');assert.equal(await blob.text(),'Zone,Ward');
  }finally{global.document=originalDocument;URL.createObjectURL=originalCreate;}
 });
@@ -1397,7 +1416,7 @@ test('module cards keep required total independent when targets change and disti
   const React = require('react'), { renderToStaticMarkup } = require('react-dom/server'), { ModuleDelivery } = require('../src/pages/commissioner/ModuleDelivery.tsx');
   const official = summarizeZones({ zones: [{ modules: [{ module: 'TOILET', target: 9, targetConfigured: true, completed: 5, siPending: 3, cleaned: 2, notCleaned: 1, actionRequired: 1, actionTaken: 2 }] }] });
   const html = renderToStaticMarkup(React.createElement(ModuleDelivery, { modules: ['toilets'], pulse: { official, pending: 0, errors: {} }, data, loading: false, zone: '', ward: '', onInspect: () => { } }));
-  assert.match(html, /inspection-module-card/); assert.doesNotMatch(html, /<table/); assert.match(html, /data-metric="pending">4/); assert.match(html, /data-metric="pending_review">3/); assert.match(html, /data-metric="action_taken">2/);
+  assert.match(html, /inspection-module-card/); assert.doesNotMatch(html, /<table/); assert.match(html, /data-metric="pending">0/); assert.match(html, /data-metric="completed">5/); assert.match(html, /data-metric="achievement" data-met="true">100%/); assert.match(html, /data-metric="pending_review">3/); assert.match(html, /data-metric="action_taken">2/);
   const { COMMISSIONER_TERMS } = require('../src/services/commissionerTerms.ts'); for (const key of ['target', 'pending', 'pendingReview', 'cleaned', 'notCleaned', 'unique', 'repeated', 'coverage', 'actionRequired', 'actionTaken']) assert.ok(html.includes(COMMISSIONER_TERMS[key]), key);
 });
 
@@ -2266,7 +2285,8 @@ test('visible workspaces refresh reports and officer performance every 30 second
   fakeDocument.hidden=false;fakeDocument.dispatchEvent(new Event('visibilitychange'));assert.equal(updates,2);
   fakeWindow.dispatchEvent(new Event('focus'));assert.equal(updates,2,'focus and visibility events must not duplicate a refresh');
   now+=6000;fakeWindow.dispatchEvent(new Event('focus'));assert.equal(updates,3);
-  cleanup();assert.equal(timerCleared,true);now+=6000;fakeWindow.dispatchEvent(new Event('focus'));assert.equal(updates,3);
+  fakeWindow.dispatchEvent(new Event('matrixtrack:targets-changed'));assert.equal(updates,4,'a saved target refreshes immediately, inside the normal focus throttle');
+  cleanup();assert.equal(timerCleared,true);now+=6000;fakeWindow.dispatchEvent(new Event('focus'));fakeWindow.dispatchEvent(new Event('matrixtrack:targets-changed'));assert.equal(updates,4);
  }finally{React.useState=savedState;React.useEffect=savedEffect;global.window=savedWindow;global.document=savedDocument;Date.now=savedNow;}
 });
 
@@ -2309,10 +2329,15 @@ test('ULB dashboard renders one multi-zone ward selection consistently in target
  const visits=assets.map(a=>({...a,id:`r-${a.id}`,assetId:a.id,status:'SUBMITTED',submittedAt:'2026-11-04T04:00:00Z',raw:{status:'SUBMITTED',intelligenceSuggestion:{outcome:'CLEAN',confidencePercent:90,reason:'Clean'}}}));
  let stateIndex=0;
  React.useState=initial=>savedState(stateIndex++===0?['z1','z2']:stateIndex===2?['w1','w3']:initial);
- coverageHook.useInspectionCoverage=()=>({loading:false,data:{...emptyCoverage(),inventoryAvailable:true,modules:['sweeping'],assets,visits}});
- commissioner.useCityPulse=()=>({pending:0,errors:{},performance:{SUPERVISOR:{u:{rows:wards.map(w=>({wardId:w.id,zoneName:zones.find(z=>z.id===w.zoneId).name,module:'SWEEPING',source:'ADMIN',target:10,credit:1}))}}}});
+ coverageHook.useInspectionCoverage=()=>({loading:false,data:{...emptyCoverage(),inventoryAvailable:true,modules:['sweeping'],assets,visits:[...visits,{...visits[0],id:'legacy-extra-point'},{...visits[0],id:'legacy-draft',status:'DRAFT',raw:{status:'DRAFT'}}]}});
+ commissioner.useCityPulse=()=>({pending:0,errors:{},performance:{SUPERVISOR:{u:{performance:2.4,rows:wards.map(w=>({wardId:w.id,zoneName:zones.find(z=>z.id===w.zoneId).name,module:'SWEEPING',source:'ADMIN',target:10,credit:1,targetPercent:20}))}},QC:{si:{performance:99}},ACTION_OFFICER:{iec:{performance:99}}}});
  try {
   const html=renderToStaticMarkup(React.createElement(UlbDashboard,{city:{id:'c',name:'City',enabledModules:['sweeping']},zones,wards,currentUser:{id:'ulb'},noticeRequest:0,onNavigate:()=>{},onSelectReport:()=>{},onNoticeCount:()=>{},onNoticeHandled:()=>{}}));
+  assert.match(html,/<span>Daroga<\/span><strong>10%<\/strong><small>2 \/ 20 target reports - selected area &amp; dates<\/small>/);
+  assert.match(html,/20% configured/);
+  assert.match(html,/<span>SI<\/span><strong>0%<\/strong><small>0 \/ 2 reports reviewed/);
+  assert.match(html,/0 \/ 0 actions completed - selected area &amp; dates/);
+  assert.doesNotMatch(html,/City-wide officer score|99%/);
   assert.match(html,/2 zones selected/);assert.match(html,/2 wards selected/);
   assert.match(html,/data-target-progress="target">20</);assert.match(html,/data-target-progress="received">2</);assert.match(html,/data-target-progress="remaining">18</);
   assert.match(html,/data-outcome="CLEAN"[^]*?<strong>2<\/strong>/);
@@ -2355,7 +2380,7 @@ test('Commissioner overview renders multi-zone and ward totals consistently acro
  const zones=[{id:'z1',cityId:'c',name:'Zone 1'},{id:'z2',cityId:'c',name:'Zone 2'},{id:'z3',cityId:'c',name:'Zone 3'}];
  const wards=[{id:'w1',zoneId:'z1',cityId:'c',name:'Ward 1'},{id:'w2',zoneId:'z1',cityId:'c',name:'Ward 2'},{id:'w3',zoneId:'z2',cityId:'c',name:'Ward 3'},{id:'w4',zoneId:'z3',cityId:'c',name:'Ward 4'}];
  const assets=wards.map(w=>({id:w.id,module:'sweeping',zoneId:w.zoneId,wardId:w.id,name:w.name}));
- const visits=assets.map(a=>({...a,id:`r-${a.id}`,assetId:a.id,status:'SUBMITTED',raw:{status:'SUBMITTED',intelligenceSuggestion:{outcome:'NOT_CLEAN',confidencePercent:90,reason:'Waste'}}}));
+ const visits=assets.map(a=>({...a,id:`r-${a.id}`,assetId:a.id,status:'SUBMITTED',submittedAt:'2026-11-05T04:00:00Z',raw:{status:'SUBMITTED',intelligenceSuggestion:{outcome:'NOT_CLEAN',confidencePercent:90,reason:'Waste'}}}));
  let stateIndex=0,requested;
  React.useState=initial=>savedState(stateIndex++===0?['z1','z2']:stateIndex===2?['w1','w3']:initial);
  coverageHook.useInspectionCoverage=()=>({loading:false,data:{...emptyCoverage(),inventoryAvailable:true,modules:['sweeping'],assets,visits}});
@@ -2375,6 +2400,24 @@ function reviewHookHarness(){
  React.useEffect=(effect,deps)=>{const at=index++,previous=slots[at];if(!previous||deps.some((dep,i)=>!Object.is(dep,previous.deps[i])))scheduled.push(()=>{previous?.cleanup?.();slots[at]={deps,cleanup:effect()};});};
  return {render:read=>{index=0;scheduled=[];const value=read();scheduled.forEach(run=>run());return value;},close:()=>{for(const slot of slots)slot?.cleanup?.();Object.assign(React,saved);}};
 }
+
+test('SI target reads the ULB saved percentage for the selected area and refreshes without a hardcoded 10%',async()=>{
+ const apiModule=require('../src/services/api.ts'),refresh=require('../src/services/useOperationalRefresh.ts');
+ const {SiReviewOverview}=require('../src/components/analytics/SiReviewOverview.tsx');
+ const {emptyCoverage}=require('../src/services/inspectionCoverage.ts');
+ const originalApi=apiModule.api,originalRefresh=refresh.useOperationalRefresh,jobs=[];let revision=0;
+ apiModule.api=(path,options)=>new Promise(resolve=>jobs.push({path,options,resolve}));refresh.useOperationalRefresh=()=>revision;
+ const data={...emptyCoverage(),modules:['toilets'],visits:Array.from({length:47},(_,i)=>({id:`r${i}`,module:'toilets',zoneId:'z',wardId:'w',status:'SUBMITTED',submittedAt:'2026-11-12T04:00:00Z'}))};
+ const harness=reviewHookHarness(),props={cityId:'city',data,loading:false,zoneIds:['z'],wardIds:['w'],onPending:()=>{}},read=()=>SiReviewOverview(props),flush=()=>new Promise(setImmediate);
+ const target=tree=>{const children=tree?.props?.children;for(const node of Array.isArray(children)?children:[children]){if(!node||typeof node!=='object')continue;if(node.type==='button'){const parts=node.props.children;if(Array.isArray(parts)&&parts[0]?.props?.children?.[0]==='SI target')return parts[1].props.children;}const found=target(node);if(found!==undefined)return found;}};
+ try{
+  harness.render(read);assert.equal(jobs.length,1);assert.match(jobs[0].path,/role=QC&zoneIds=z&wardIds=w/);assert.equal(jobs[0].options.cache,'no-store');
+  jobs[0].resolve({targets:0,percentTargets:0,percents:[],defaultPercent:10});await flush();assert.equal(target(harness.render(read)),'5');
+  revision++;harness.render(read);jobs[1].resolve({targets:3,percentTargets:3,percents:[20],defaultPercent:10});await flush();assert.equal(target(harness.render(read)),'10');
+  revision++;harness.render(read);jobs[2].resolve({targets:3,percentTargets:3,percents:[50],defaultPercent:10});await flush();assert.equal(target(harness.render(read)),'24');
+  props.wardIds=['other'];harness.render(read);assert.equal(jobs.length,4);assert.match(jobs[3].path,/wardIds=other/);
+ }finally{harness.close();apiModule.api=originalApi;refresh.useOperationalRefresh=originalRefresh;}
+});
 
 test('slow background coverage refresh keeps figures, blocks overlap and identifies stale figures after failure',async()=>{
  const coverage=require('../src/services/inspectionCoverage.ts'),refresh=require('../src/services/useOperationalRefresh.ts'),{useInspectionCoverage}=require('../src/services/useInspectionCoverage.ts');

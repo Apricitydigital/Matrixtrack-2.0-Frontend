@@ -1,6 +1,7 @@
 import { concurrentReads } from './concurrentReads';
-import { inspectionOutcomes } from './inspectionCoverage';
+import { inspectionOutcomes, selectInspectionModules } from './inspectionCoverage';
 import { inspectionMetrics } from './inspectionMetrics';
+import { reportTargetDelivery } from './targetDelivery';
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import { moduleId, MODULE_KEYS } from './adapters';
@@ -12,7 +13,7 @@ import type { OperationalModuleId } from '../types';
 import { aggregateTargetState, verifyTargetFigures, type TargetEvidence, type TargetConfiguration } from './targetConfiguration';
 export interface BriefingNotice {id:string;title:string;detail:string;count:number;tone:'red'|'yellow';page:string;}
 export const INSPECTION_KEYS=['target','completed','pending','cleaned','notCleaned','siPending','actionRequired','actionPending','actionTaken'] as const;
-export type InspectionFigures=Record<typeof INSPECTION_KEYS[number],number>&{targetPercent?:number}&TargetEvidence;
+export type InspectionFigures=Record<typeof INSPECTION_KEYS[number],number>&{targetPercent?:number;targetBasis?:'current'|'historical'}&TargetEvidence;
 const emptyFigures=():InspectionFigures=>({target:0,completed:0,pending:0,cleaned:0,notCleaned:0,siPending:0,actionRequired:0,actionPending:0,actionTaken:0});
 export function summarizeZones(data:any) {
   const totals=emptyFigures(),modules:Partial<Record<OperationalModuleId,InspectionFigures>>={};
@@ -43,23 +44,24 @@ export function applyTargetConfiguration(official:ReturnType<typeof summarizeZon
   return {...official,totals:verifyTargetFigures(official.totals,configuration),modules:Object.fromEntries(Object.entries(official.modules).map(([id,value])=>[id,verifyTargetFigures(value,configuration)])),zones:official.zones.map(zone=>({...zone,totals:verifyTargetFigures(zone.totals,configuration)}))};
 }
 /** The zone export omits source metadata. Daroga rows expose the same target/credit calculation with ADMIN/DEFAULT evidence. */
-export function performanceTargetRows(official:ReturnType<typeof summarizeZones>,users:Record<string,any>,wardId:string|string[]='') {
+export function performanceTargetRows(official:ReturnType<typeof summarizeZones>,users:Record<string,any>,wardId:string|string[]='',moduleIds:string[]=[]) {
   const wardIds=Array.isArray(wardId)?wardId:wardId?[wardId]:[];
   const rows=Object.values(users||{}).flatMap(user=>Array.isArray(user?.rows)?user.rows:[]).filter(row=>row.wardId&&moduleId(row.module)&&(!wardIds.length||wardIds.includes(row.wardId))&&['ADMIN','DEFAULT'].includes(row.source)&&Number.isFinite(row.target)&&row.target>=0&&Number.isFinite(row.credit)&&row.credit>=0);
-  return rows.filter(row=>official.zones.some(zone=>zone.name===row.zoneName));
+  return rows.filter(row=>official.zones.some(zone=>zone.name===row.zoneName)&&(!moduleIds.length||moduleIds.includes(moduleId(row.module))));
 }
 export function unmappedTargetUnits(users:Record<string,any>,zoneNames:string[]) {
   return Object.values(users||{}).flatMap(user=>Array.isArray(user?.rows)?user.rows:[]).filter(row=>!zoneNames.includes(row.zoneName)&&Number.isFinite(row.target)&&row.target>0).reduce((total,row)=>total+row.target,0);
 }
-export function applyPerformanceTargets(official:ReturnType<typeof summarizeZones>,users:Record<string,any>,wardId:string|string[]='') {
-  const selected=performanceTargetRows(official,users,wardId);
+export function applyPerformanceTargets(official:ReturnType<typeof summarizeZones>,users:Record<string,any>,wardId:string|string[]='',moduleIds:string[]=[]) {
+  const selected=performanceTargetRows(official,users,wardId,moduleIds);
   const resolve=(figures:InspectionFigures,scope:any[])=>{
     if(!scope.length)return figures;
     if(!scope.some(row=>row.source==='ADMIN'))return {...figures,targetState:'default' as const};
     const target=scope.reduce((n,row)=>n+row.target,0),completed=scope.reduce((n,row)=>n+row.credit,0);
     const percentages=scope.map(row=>row.source==='ADMIN'?row.targetPercent:null);
     const percentage=percentages.every(value=>typeof value==='number'&&value>=1&&value<=100&&value===percentages[0])?percentages[0]:undefined;
-    return {...figures,target,completed,pending:Math.max(0,target-completed),targetState:'configured' as const,targetPercent:percentage};
+    const targetBasis=scope.every(row=>row.targetBasis==='current')?'current' as const:'historical' as const;
+    return {...figures,target,completed,pending:Math.max(0,target-completed),targetState:'configured' as const,targetPercent:percentage,targetBasis};
   };
   return {...official,totals:resolve(official.totals,selected),modules:Object.fromEntries(Object.entries(official.modules).map(([id,value])=>[id,resolve(value,selected.filter(row=>moduleId(row.module)===id))])),zones:official.zones.map(zone=>({...zone,totals:resolve(zone.totals,selected.filter(row=>row.zoneName===zone.name))}))};
 }
@@ -140,15 +142,23 @@ export function ulbInspectionSummary(data:InspectionCoverage,zones:{id:string;na
 }
 
 /** Preserve backend target credit while sourcing all current statuses from the full report register. */
-export function reconcileZoneExport(report:any,coverage:InspectionCoverage,wardIds:string[]=[],performance?:Record<string,any>) {
+export function reconcileZoneExport(report:any,coverage:InspectionCoverage,wardIds:string[]=[],performance?:Record<string,any>,moduleIds:string[]=[]) {
+  if(moduleIds.length){
+    coverage=selectInspectionModules(coverage,moduleIds);
+    report={...report,zones:(report.zones||[]).map((z:any)=>{
+      const modules=(z.modules||[]).filter((m:any)=>moduleIds.includes(moduleId(m.module||m.key||'')));
+      const totals=summarizeZones({zones:[{...z,total:undefined,modules}]}).totals;
+      return {...z,modules,...(z.total?{total:{...z.total,...totals}}:{})};
+    })};
+  }
   const data=wardIds.length?{...coverage,failedModules:[...new Set([...coverage.failedModules,...coverage.visits.filter(v=>!v.wardId).map(v=>v.module)])],assets:coverage.assets.filter(a=>wardIds.includes(a.wardId)),visits:coverage.visits.filter(v=>!v.wardId||wardIds.includes(v.wardId))}:coverage;
   const row=(value:any,zone:string,module?:OperationalModuleId)=>{
     const outcomes=inspectionOutcomes(data,{zone,module});
     const count=(id:string)=>outcomes.rows.find(r=>r.id===id)?.value??null;
     const zoneSummary=summarizeZones({zones:(report.zones||[]).filter(z=>(z.zoneId||z.id)===zone)});
-    const official=performance?applyPerformanceTargets(zoneSummary,performance):zoneSummary;
+    const official=performance?applyPerformanceTargets(zoneSummary,performance,wardIds,moduleIds):zoneSummary;
     const metrics=inspectionMetrics(data,{zone,module},module?official.modules[module]:official.totals);
-    return {...value,intelligenceSuggestedClean:metrics.intelligence?.CLEAN??null,intelligenceSuggestedNotCleaned:metrics.intelligence?.NOT_CLEAN??null,intelligenceUnableToAssess:metrics.intelligence?.UNASSESSABLE??null,awaitingIntelligence:metrics.intelligence?.AWAITING_AI??null,totalEntities:metrics.totalEntities,inspectionTarget:metrics.delivery.target,achieved:metrics.achieved,uniqueEntities:metrics.uniqueEntities,coveragePercent:metrics.coveragePercent,targetCredit:metrics.delivery.completed,targetAchievement:metrics.delivery.percent,targetMethod:metrics.delivery.fallback?'One completed visit per asset per selected day':'Configured target',inspections:outcomes.total,cleaned:count('approved'),siPending:count('pending_review'),notCleaned:count('rejected'),actionRequired:count('action_required'),actionPending:count('action_required'),actionTaken:count('action_taken'),escalated:count('escalated'),unclassified:count('unclassified')};
+    return {...value,intelligenceSuggestedClean:metrics.intelligence?.CLEAN??null,intelligenceSuggestedNotCleaned:metrics.intelligence?.NOT_CLEAN??null,intelligenceUnableToAssess:metrics.intelligence?.UNASSESSABLE??null,awaitingIntelligence:metrics.intelligence?.AWAITING_AI??null,totalEntities:metrics.totalEntities,inspectionTarget:metrics.delivery.target,achieved:metrics.achieved,uniqueEntities:metrics.uniqueEntities,coveragePercent:metrics.coveragePercent,targetCredit:metrics.delivery.completed,targetAchievement:reportTargetDelivery(metrics.delivery,metrics.achieved).percent,scoringAchievement:metrics.delivery.percent,targetMethod:metrics.delivery.fallback?'One completed visit per asset per selected day':'Configured target',inspections:outcomes.total,cleaned:count('approved'),siPending:count('pending_review'),notCleaned:count('rejected'),actionRequired:count('action_required'),actionPending:count('action_required'),actionTaken:count('action_taken'),escalated:count('escalated'),unclassified:count('unclassified')};
   };
   const wardRow=(value:any,zone:string)=>{
     const outcomes=inspectionOutcomes(data,{zone,ward:value.wardId});
