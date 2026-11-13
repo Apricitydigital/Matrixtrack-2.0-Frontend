@@ -3,11 +3,11 @@ export const naturalCompare=(a:string,b:string)=>a.localeCompare(b,undefined,{nu
 const beatFields:Record<string,[string,string]>={
  totalBeats:['Registered beats','Current beat inventory; independent of the selected number of days.'],
  beatsDue:['Planned beat visits','Registered beats × inclusive selected days. This is the total requirement, not the remaining work.'],
- beatsChecked:['Submitted beat visits','One submitted report per beat per operational day. Drafts are excluded.'],
- beatsNotChecked:['Visits awaiting submission','Planned visits minus submitted visits. Includes unfinished drafts.'],
+ beatsChecked:['Submitted beat visits','One submitted report per beat per operational day.'],
+ beatsNotChecked:['Visits awaiting submission','Planned visits minus submitted visits. Includes reports still pending at Daroga.'],
  totalPointsExpected:['Planned point captures','Configured points across registered beats × selected days.'],
- pointsCaptured:['Point captures saved','Captured beat points, including unfinished Draft reports. Different days count separately.'],
- beatsInProgress:['Draft visits started','Draft beat reports with at least one point captured. These are already included in visits awaiting submission.'],
+ pointsCaptured:['Point captures saved','Captured beat points, including unfinished reports not yet submitted. Different days count separately.'],
+ beatsInProgress:['Visits started','Beat reports with at least one point captured but not submitted. These are already included in visits awaiting submission.'],
  completeBeatCoverage:['Visits with all points','Submitted beat visits capturing every configured point. Three points may permit submission without completing all five.'],
 };
 

@@ -2,7 +2,7 @@ import { actionLifecycle } from './actionLifecycle';
 import { inspectionStatus, type InspectionCoverage, type InspectionVisit } from './inspectionCoverage';
 
 // A grouped report retains unresolved findings rather than presenting a partly
-// reviewed beat as cleaned. Draft evidence never overrides submitted evidence.
+// reviewed beat as cleaned. reports not yet submitted evidence never overrides submitted evidence.
 const priority = ['action_required', 'escalated', 'rejected', 'pending_review', 'action_taken', 'approved', 'unclassified'];
 
 export function mergeBeatReport(visits: InspectionVisit[]): InspectionVisit {

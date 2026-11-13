@@ -5,7 +5,7 @@ export const INSPECTION_STATUSES = [
   {id:'action_required',label:'Action required',tone:'red'},
   {id:'action_taken',label:'Action taken',tone:'yellow'},
   {id:'escalated',label:'Escalated',tone:'red'},
-  {id:'unclassified',label:'Draft',tone:'neutral'},
+  {id:'unclassified',label:'Pending review',tone:'neutral'},
 ] as const;
 export function inspectionStatus(status?:string) {
   const key=String(status||'').trim().toLowerCase().replace(/[\s-]+/g,'_');
