@@ -47,7 +47,7 @@ export async function loadInspectionCoverage(city: Pick<City,'id'|'enabledModule
         const data=await api(`/city/dashboard/inspection-coverage?${new URLSearchParams({from,to,modules:city.enabledModules.join(',')})}`,{signal:sharedSignal,cache:'no-store'});
         if(data?.version!==1||data.complete!==true||data.cityId!==city.id||data.from!==from||data.to!==to||!Array.isArray(data.assets)||!Array.isArray(data.visits)||!Array.isArray(data.modules)||!Array.isArray(data.failedModules)||!Array.isArray(data.errors)||typeof data.inventoryAvailable!=='boolean'||city.enabledModules.some(m=>!data.modules.includes(m)))throw Error('Compact inspection register is incomplete or has the wrong scope.');
         if(data.visits.some((v:any)=>!v.id||!city.enabledModules.includes(v.module)||!v.submittedAt)||data.assets.some((a:any)=>!a.id||!city.enabledModules.includes(a.module)))throw Error('Compact inspection register is missing required identifiers.');
-        return {...data,visits:data.visits.map((visit:InspectionVisit)=>{const lifecycle=actionLifecycle(visit.raw);return {...visit,actionRequired:lifecycle.required,actionTaken:lifecycle.taken};}),compact:true} as InspectionCoverage;
+        return {...data,visits:data.visits.filter((visit:InspectionVisit)=>inspectionStatus(visit.status||"SUBMITTED")!=="unclassified").map((visit:InspectionVisit)=>{const lifecycle=actionLifecycle(visit.raw);return {...visit,actionRequired:lifecycle.required,actionTaken:lifecycle.taken};}),compact:true} as InspectionCoverage;
       }catch(error){
         // Old backends and scoped field roles retain their existing authorized reader.
         if(!(error instanceof ApiError)||![403,404].includes(error.status))throw error;
@@ -98,7 +98,7 @@ async function fetchInspectionCoverage(city: Pick<City,'id'|'enabledModules'>, f
         const responses=await Promise.all(pages.map(readPage));responses.forEach((response,i)=>consume(response,pages[i]));
       }
       if(expectedTotal!=null&&seenReports.size!==expectedTotal)throw new Error('Inspection pages do not match the reported total.');
-      result.visits.push(...visits.values());return;
+      result.visits.push(...[...visits.values()].filter(v=>inspectionStatus(v.status||"SUBMITTED")!=="unclassified"));return;
     }catch(error){if(signal.aborted)throw error;result.failedModules.push(module);result.errors.push(`${MODULE_KEYS[module]}: ${error instanceof Error?error.message:'Inspection counts unavailable.'}`);}
   };
   const records=concurrentReads(city.enabledModules.map(module=>()=>loadModule(module)),2).then(results=>{const failed=results.find(r=>r.status==='rejected');if(failed?.status==='rejected')throw failed.reason;});
@@ -151,7 +151,7 @@ export function zoneCoverage(data:InspectionCoverage,zones:Zone[],rankings:any[]
 export function inspectionOutcomes(data:InspectionCoverage,scope:{module?:OperationalModuleId;zone?:string;ward?:string}={}) {
   const counts=coverageCounts(data,scope),known=counts.inspections!=null;
   const visits=[...new Map(data.visits.filter(v=>(!scope.module||v.module===scope.module)&&(!scope.zone||v.zoneId===scope.zone)&&(!scope.ward||v.wardId===scope.ward)).map(v=>[v.id,v])).values()];
-  return {total:counts.inspections,rows:INSPECTION_STATUSES.map(row=>({...row,value:known?visits.filter(v=>inspectionStatus(v.status)===row.id).length:null}))};
+  return {total:counts.inspections,rows:INSPECTION_STATUSES.filter(row=>row.id!=="unclassified").map(row=>({...row,value:known?visits.filter(v=>inspectionStatus(v.status)===row.id).length:null}))};
 }
 
 
