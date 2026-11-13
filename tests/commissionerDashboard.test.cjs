@@ -196,7 +196,7 @@ test('Commissioner and ULB show 100% inspection baseline before configured targe
    tree=h.render(component,values);let html=renderToStaticMarkup(tree);
    assert.match(html,/data-target-progress="full-target">675</);
    assert.ok(html.indexOf('data-target-progress="full-target"')<html.indexOf('data-target-progress="target"'));
-   assert.match(html,/Total inspections required/);assert.match(html,/Total reports at 100% target/);
+   assert.match(html,/class="zone-overview-full-target"[^>]*><span>Total inspections required<small>At 100% target<\/small><\/span>/);
    assert.match(html,/data-zone-full-target="z1">180</);assert.match(html,/data-zone-full-target="z2">135</);
    find(tree,n=>n.type===MultiSelectDropdown&&n.props.label==='Modules').props.onChange(['toilets']);
    tree=h.render(component,values);html=renderToStaticMarkup(tree);

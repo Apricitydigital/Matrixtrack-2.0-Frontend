@@ -271,4 +271,4 @@
 .zone-overview-progress{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:#6b7280;font-weight:600}
 .zone-overview-progress strong{font-size:20px;color:#3f8c99}
 
-.zone-overview-full-target{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;border-radius:8px;background:var(--surface-soft,#eef5f8);color:var(--ink,#41596a);font-size:10px;line-height:1.5;text-align:left}.zone-overview-full-target b{font-size:13px;white-space:nowrap}
+.zone-overview-full-target{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;border-radius:8px;background:var(--surface-soft,#eef5f8);color:var(--ink,#41596a);font-size:11px;font-weight:600;line-height:1.5;text-align:left}.zone-overview-full-target small{display:block;font-size:10px;font-weight:400;color:var(--muted,#6b7280)}.zone-overview-full-target b{font-size:17px;white-space:nowrap}
