@@ -186,3 +186,26 @@ test('zone export totals and targets exclude unselected modules without mutating
  assert.equal(withoutPerformance.total.inspectionTarget,30);
  assert.equal(report.zones[0].total.target,90);assert.equal(report.zones[0].modules.length,2);
 });
+
+test('Commissioner and ULB show 100% inspection baseline before configured target and in each zone tag',()=>{
+ for(const component of [CommissionerHome,UlbDashboard]){
+  const h=harness(),values={...props,currentUser:{id:'officer',role:component===UlbDashboard?'ULB_OFFICER':'COMMISSIONER'},onInspectZone:()=>{},onNoticeHandled:()=>{}};
+  try{
+   let tree=h.render(component,values);
+   find(tree,n=>n.type===MultiSelectDropdown&&n.props.label==='Zones').props.quickSelection.onSelect();
+   tree=h.render(component,values);let html=renderToStaticMarkup(tree);
+   assert.match(html,/data-target-progress="full-target">675</);
+   assert.ok(html.indexOf('data-target-progress="full-target"')<html.indexOf('data-target-progress="target"'));
+   assert.match(html,/Total inspections required/);assert.match(html,/Total reports at 100% target/);
+   assert.match(html,/data-zone-full-target="z1">180</);assert.match(html,/data-zone-full-target="z2">135</);
+   find(tree,n=>n.type===MultiSelectDropdown&&n.props.label==='Modules').props.onChange(['toilets']);
+   tree=h.render(component,values);html=renderToStaticMarkup(tree);
+   assert.match(html,/data-target-progress="full-target">225</);assert.match(html,/data-zone-full-target="z1">60</);
+   // The full baseline comes from inventory and dates, independently of target loading.
+   commissioner.useCityPulse=()=>({pending:1,errors:{},performance:undefined,rankings:[]});
+   tree=h.render(component,values);html=renderToStaticMarkup(tree);assert.match(html,/data-target-progress="full-target">225</);
+   coverageHook.useInspectionCoverage=()=>({loading:false,data:{...data,inventoryAvailable:false}});
+   tree=h.render(component,values);html=renderToStaticMarkup(tree);assert.doesNotMatch(html,/data-target-progress="full-target">0</);
+  }finally{h.close();}
+ }
+});
