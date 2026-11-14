@@ -161,6 +161,7 @@ export interface User {
   assignedBeatIds?: string[];
   moduleAssignments?: {id?:string;key:string;canWrite?:boolean;zoneIds:string[];wardIds:string[]}[];
   employeeId?:string;
+  aadhaar?:string;
   employmentType?:string;
   status: 'active' | 'inactive' | 'pending_approval' | 'needs_correction' | 'rejected';
   requestedModules?:string[];
