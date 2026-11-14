@@ -4,7 +4,7 @@ import type { City, User, Ward, Zone } from '../../types';
 import { api } from '../../services/api';
 import { matrixStore } from '../../services/store';
 import { useInspectionCoverage } from '../../services/useInspectionCoverage';
-import { darogaAttendance, darogaCleaned, darogaOverall, DAROGA_WEIGHTS } from '../../services/darogaBreakdown';
+import { attendanceGap, darogaAttendance, darogaCleaned, darogaOverall, DAROGA_WEIGHTS } from '../../services/darogaBreakdown';
 import { Drawer } from '../../components/common/Drawer';
 import { OfficerPerformanceDetail } from './OfficerPerformanceDetail';
 import { Pagination, usePagination } from '../../components/common/Pagination';
@@ -18,12 +18,19 @@ export function DarogaPerformanceTabs({ city, rows, tab, onTab, rawStats, wards,
   const { from, to } = matrixStore.getDateRange();
   const coverage = useInspectionCoverage(city, from, to, matrixStore.loadRevision, true, true);
   const [selectedId, setSelectedId] = useState('');
-  const [attendance, setAttendance] = useState<{ rows: any[]; status: 'loading' | 'ready' | 'error' }>({ rows: [], status: 'loading' });
+  const [attendance, setAttendance] = useState<{ rows: any[]; status: 'loading' | 'ready' | 'error'; period: string; fallback: boolean }>({ rows: [], status: 'loading', period: '', fallback: false });
   useEffect(() => {
-    const c = new AbortController(); setAttendance({ rows: [], status: 'loading' });
-    api(`/city/attendance/dashboard?${new URLSearchParams({ from, to, page: '1', pageSize: '1' })}`, { signal: c.signal, cache: 'no-store' })
-      .then(d => { if (!c.signal.aborted) setAttendance({ rows: Array.isArray(d?.allEmployees) ? d.allEmployees : [], status: 'ready' }); })
-      .catch(() => { if (!c.signal.aborted) setAttendance({ rows: [], status: 'error' }); });
+    const c = new AbortController(); setAttendance({ rows: [], status: 'loading', period: '', fallback: false });
+    const read = (q: Record<string, string>) => api(`/city/attendance/dashboard?${new URLSearchParams({ cityId: city.id, ...q, page: '1', pageSize: '1' })}`, { signal: c.signal, cache: 'no-store' });
+    const label = (d: any, f: string, t: string) => { const a = String(d?.range?.from || f).slice(0, 10), b = String(d?.range?.to || t).slice(0, 10); return a === b ? a : `${a} to ${b}`; };
+    (async () => {
+      try {
+        let d = await read({ from, to }), fallback = false;
+        // Attendance is uploaded per day. If nothing was uploaded in the selected dates, use the latest uploaded day instead.
+        if (!(Array.isArray(d?.allEmployees) && d.allEmployees.length)) { d = await read({}); fallback = true; }
+        if (!c.signal.aborted) setAttendance({ rows: Array.isArray(d?.allEmployees) ? d.allEmployees : [], status: 'ready', period: label(d, from, to), fallback });
+      } catch { if (!c.signal.aborted) setAttendance({ rows: [], status: 'error', period: '', fallback: false }); }
+    })();
     return () => c.abort();
   }, [city.id, from, to]);
 
@@ -54,7 +61,7 @@ export function DarogaPerformanceTabs({ city, rows, tab, onTab, rawStats, wards,
     const att = d.att, c = d.cleaned;
     if (tab === 'overall') return [<b key="o">{pct(d.overall.score)}</b>, pct(d.inspection), covLoading ? '…' : pct(c.score), attLoading ? '…' : pct(att?.score)];
     if (tab === 'inspection') return [<b key="s">{pct(d.inspection)}</b>, d.stat?.completed ?? '—', d.stat?.required ?? '—'];
-    if (tab === 'attendance') return att ? [<b key="s">{pct(att.score)}</b>, att.presentDays, att.recordedDays, att.absentDays] : [<b key="s">{attLoading ? '…' : 'Not matched'}</b>, '—', '—', '—'];
+    if (tab === 'attendance') return att ? [<b key="s">{pct(att.score)}</b>, att.presentDays, att.recordedDays, att.absentDays] : [<b key="s">{attLoading ? '…' : 'Not matched'}</b>, <span key="g" title={attendanceGap(d.user, attendance.rows)}>—</span>, '—', '—'];
     return covLoading ? [<b key="s">…</b>, '…', '…', '…', '…', '…'] : [<b key="s">{pct(c.score)}</b>, c.cleaned, c.notCleaned, c.siDecided, c.aiSuggested, c.unassessed];
   };
   const note: Record<DarogaTab, string> = {
@@ -66,7 +73,7 @@ export function DarogaPerformanceTabs({ city, rows, tab, onTab, rawStats, wards,
   return <section className="workspace-panel daroga-performance-tabs">
     <div className="workspace-panel-heading"><div><span className="workspace-eyebrow">DAROGA</span><h2>Performance by parameter</h2></div>
       <div className="view-switch no-print" role="tablist" aria-label="Daroga performance parameter">{DAROGA_TABS.map(([id, label]) => <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'active' : ''} onClick={() => onTab(id)}>{label}</button>)}</div></div>
-    <p className="score-context-note">{note[tab]}</p>
+    <p className="score-context-note">{note[tab]}{tab === 'attendance' && attendance.status === 'ready' ? ` Attendance for ${attendance.period || 'the selected dates'}${attendance.fallback ? ' (latest uploaded day; nothing was uploaded in the selected dates)' : ''}. Matched ${data.filter(d => d.att).length} of ${data.length} Darogas from ${attendance.rows.length} attendance rows.` : ''}{attendance.status === 'error' && tab === 'attendance' ? ' Attendance data could not be loaded.' : ''}</p>
     <div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr><th>Daroga</th><th>Zone</th><th>Ward</th>{head[tab].map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>
       {paging.rows.map(d => <tr key={d.user.id} tabIndex={0} role="button" style={{cursor:'pointer'}} aria-label={`Open performance details for ${d.user.name}`} onClick={() => setSelectedId(d.user.id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedId(d.user.id); } }}><td>{d.user.name}</td><td>{place(d.user).zone}</td><td>{place(d.user).ward}</td>{cells(d).map((c, i) => <td key={i}>{c}</td>)}</tr>)}
     </tbody></table></div>
@@ -77,7 +84,7 @@ export function DarogaPerformanceTabs({ city, rows, tab, onTab, rawStats, wards,
         {([['Overall', selected.overall.score], ['Inspection (40%)', selected.inspection], ['Cleaned (40%)', selected.cleaned.score], ['Attendance (20%)', selected.att?.score ?? null]] as [string, number | null][]).map(([l, v]) => <article key={l}><span>{l}</span><strong>{pct(v)}</strong></article>)}
       </div>
       <p className="score-context-note" style={{ marginBottom: 8 }}><b>Aadhaar:</b> {selected.user.aadhaar ? selected.user.aadhaar.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 ') : 'Not recorded'}{selected.user.employeeId ? <> · <b>Employee ID:</b> {selected.user.employeeId}</> : null}</p>
-      <p className="score-context-note" style={{ marginBottom: 16 }}>Cleaned {selected.cleaned.cleaned} · Not cleaned {selected.cleaned.notCleaned} ({selected.cleaned.siDecided} by SI decision, {selected.cleaned.aiSuggested} by AI suggestion, {selected.cleaned.unassessed} not assessable). Attendance: {selected.att ? `${selected.att.presentDays} present of ${selected.att.recordedDays} recorded days` : 'no matching attendance record'}.</p>
+      <p className="score-context-note" style={{ marginBottom: 16 }}>Cleaned {selected.cleaned.cleaned} · Not cleaned {selected.cleaned.notCleaned} ({selected.cleaned.siDecided} by SI decision, {selected.cleaned.aiSuggested} by AI suggestion, {selected.cleaned.unassessed} not assessable). Attendance: {selected.att ? `${selected.att.presentDays} present of ${selected.att.recordedDays} recorded days` : attendanceGap(selected.user, attendance.rows)}.</p>
       <OfficerPerformanceDetail key={selected.user.id + module} user={selected.user} raw={rawStats?.[selected.user.id]} role="SUPERVISOR" module={module} wards={wards} period={matrixStore.getDateRange()} />
     </>}</Drawer>
   </section>;
