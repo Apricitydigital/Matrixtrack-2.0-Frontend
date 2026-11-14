@@ -33,13 +33,26 @@ export function darogaCleaned(visits: any[], darogaId: string, module = 'ALL'): 
 
 export interface AttendanceStats { presentDays: number; recordedDays: number; absentDays: number; score: number | null }
 
-/** Match by employee ID first, then by a name that is unique among both users and attendance rows. Never guesses. */
-export function darogaAttendance(user: { name: string; employeeId?: string }, daroga: { name: string }[], rows: any[]): AttendanceStats | null {
-  let row = user.employeeId ? rows.filter(r => key(r.attendanceId) === key(user.employeeId)) : [];
-  if (row.length !== 1) {
-    const sameUsers = daroga.filter(d => nameKey(d.name) === nameKey(user.name));
-    row = sameUsers.length === 1 ? rows.filter(r => nameKey(r.employeeName) === nameKey(user.name)) : [];
-  }
+const loose = (v: any) => String(v || '').toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\b(mr|mrs|ms|shri|smt|sh|dr)\b/g, ' ').split(/\s+/).filter(Boolean).sort().join(' ');
+const last8 = (v: any) => String(v || '').replace(/\D/g, '').slice(-8);
+const digits = (v: any) => String(v || '').replace(/\D/g, '').replace(/^0+/, '');
+
+/**
+ * Finds this Daroga's attendance row. Tried in order: the server-side link (Aadhaar / name), employee ID,
+ * phone or ID digits, exact name, then name ignoring order, titles and punctuation. A step is used only
+ * when it points at exactly one attendance row, so two people are never merged.
+ */
+export function darogaAttendance(user: { id?: string; name: string; employeeId?: string; phone?: string; aadhaar?: string }, _daroga: { name: string }[], rows: any[]): AttendanceStats | null {
+  const steps: ((r: any) => boolean)[] = [
+    r => !!user.id && r.matrixTrackUserId === user.id,
+    r => { const u = last8(user.aadhaar), a = last8(r.attendanceId); return u.length === 8 && a.length === 8 && u === a; },
+    r => !!user.employeeId && key(r.attendanceId) === key(user.employeeId),
+    r => { const a = digits(r.attendanceId), e = digits(user.employeeId), p = digits(user.phone).slice(-10); return a.length >= 6 && ((e.length >= 6 && (a.endsWith(e) || e.endsWith(a))) || (p.length === 10 && (a.includes(p) || p.endsWith(a)))); },
+    r => nameKey(r.employeeName) === nameKey(user.name),
+    r => loose(user.name) !== '' && loose(r.employeeName) === loose(user.name)
+  ];
+  let row: any[] = [];
+  for (const step of steps) { const found = rows.filter(step); if (found.length === 1) { row = found; break; } }
   if (row.length !== 1) return null;
   const r = row[0], recorded = Number(r.totalDays), present = Number(r.presentDays);
   return { presentDays: present, recordedDays: recorded, absentDays: Number(r.absentDays) || 0, score: recorded > 0 ? present / recorded * 100 : null };
@@ -53,4 +66,13 @@ export function darogaOverall(parts: { inspection: number | null | undefined; cl
     if (finite(v)) { sum += v * DAROGA_WEIGHTS[k]; weight += DAROGA_WEIGHTS[k]; }
   }
   return weight ? { score: sum / weight, weightUsed: weight } : { score: null, weightUsed: 0 };
+}
+
+/** Why a Daroga has no attendance link, so gaps can be fixed in the user record or the sheet. */
+export function attendanceGap(user: { id?: string; name: string; employeeId?: string; phone?: string; aadhaar?: string }, rows: any[]): string {
+  if (!rows.length) return 'No attendance records uploaded for these dates';
+  const ambiguous = rows.filter(r => (last8(user.aadhaar).length === 8 && last8(r.attendanceId) === last8(user.aadhaar)) || nameKey(r.employeeName) === nameKey(user.name)).length > 1;
+  if (ambiguous) return 'More than one attendance row matches; not guessed';
+  const missing = [!last8(user.aadhaar) && 'Aadhaar', !user.employeeId && 'employee ID', !digits(user.phone) && 'mobile'].filter(Boolean);
+  return `No row matches${missing.length ? ` (user has no ${missing.join(', ')})` : ''}`;
 }
