@@ -9,17 +9,8 @@ export const PERSONNEL_ROLES:Record<string,string>={CITY_ADMIN:'City Admin',SUPE
 export const PERSONNEL_MODULE_LABELS:Record<string,string>={SWEEPING:'Sweeping',TOILET:'Cleanliness of Toilet',LITTERBINS:'Litter Bins',NALA:'Nala',TASKFORCE:'CTU/GVP Transformation',WORKFORCE_MONITORING:'Workforce Monitoring',SWACHH_RANKING:'Swachh Ward Ranking',MRF:'Processing & MRF',PROCESSING_PLANT:'Plant & Processing'};
 export const enabledPersonnelKeys=(cityId:string)=>matrixStore.getCityModules(cityId).filter(m=>m.enabled&&PERSONNEL_MODULE_LABELS[m.key]).map(m=>m.key);
 export const PERSONNEL_HEADERS=['Name','Email','Phone','Password','Role','Zone','Ward','Modules'];
-export function personnelScope(user:User,wards:Ward[]){
- const wardIds=[...new Set([...(user.assignedWardIds||[]),...(user.moduleAssignments||[]).flatMap(m=>m.wardIds)])];
- const zoneIds=[...new Set([...(user.assignedZoneIds||[]),...(user.moduleAssignments||[]).flatMap(m=>m.zoneIds),...wards.filter(w=>wardIds.includes(w.id)).map(w=>w.zoneId)])];return {zoneIds,wardIds};
-}
+export {personnelScope,personnelAssignedToWard} from './personnelScope';
 export function scopeNames(ids:string[],nodes:{id:string;name:string}[]){return ids.map(id=>nodes.find(n=>n.id===id)?.name||'Unavailable geography').join(', ')||'Not assigned';}
-export function personnelAssignedToWard(user:User,ward:Ward){
- const matches=(z:string[],w:string[])=>!!(z.length||w.length)&&(!z.length||z.includes(ward.zoneId))&&(!w.length||w.includes(ward.id));
- const z=user.assignedZoneIds||[],w=user.assignedWardIds||[],scopedModules=(user.moduleAssignments||[]).filter(m=>m.zoneIds.length||m.wardIds.length);
- if(z.length||w.length)return matches(z,w)&&(!scopedModules.length||scopedModules.some(m=>matches(m.zoneIds,m.wardIds)));
- return scopedModules.some(m=>matches(m.zoneIds,m.wardIds));
-}
 export async function personnelModules(cityId:string){assertCityAdmin(cityId);const rows=await api('/city/modules');if(!Array.isArray(rows))throw new Error('Module directory is unavailable.');return rows.filter(m=>m.enabled!==false&&!!PERSONNEL_MODULE_LABELS[canonicalModuleKey(m.key||m.module?.name||m.name)]).map(m=>({id:m.moduleId||m.module?.id||m.id,key:canonicalModuleKey(m.key||m.module?.name||m.name),name:m.name||m.key}));}
 export function validatePersonnelScope(cityId:string,zoneIds:string[],wardIds:string[],role:string){
  assertCityAdmin(cityId);const {zones,wards}=matrixStore.getData();if(!PERSONNEL_ROLES[role])throw new Error('Select a municipal staff role.');
