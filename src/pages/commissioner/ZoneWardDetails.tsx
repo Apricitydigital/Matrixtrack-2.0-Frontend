@@ -17,7 +17,7 @@ import { api } from '../../services/api';
 import { matrixStore } from '../../services/store';
 import { summarizeZones, applyPerformanceTargets } from '../../services/commissioner';
 import { useInspectionCoverage } from '../../services/useInspectionCoverage';
-import { coverageCounts, inspectionOutcomes } from '../../services/inspectionCoverage';
+import { coverageCounts, inspectionOutcomes, selectInspectionCoverage } from '../../services/inspectionCoverage';
 import { targetDelivery, reportTargetDelivery } from '../../services/targetDelivery';
 import { ChartCard, BarChart } from '../../components/analytics/Analytics';
 import { OverviewInsights } from './OverviewInsights';
@@ -52,8 +52,16 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
   const selectableWards = cityWards.filter(w => selectedZoneId === 'all' || w.zoneId === selectedZoneId);
   const [selectedWardId, setSelectedWardId] = useState<string>(cityWards[0]?.id || '');
 
-  const currentWard = selectableWards.find(w => w.id === selectedWardId) || selectableWards[0];
-  const currentZone = cityZones.find(z => z.id === currentWard?.zoneId);
+  const allWards = selectedWardId === 'all';
+  const singleWard = selectableWards.find(w => w.id === selectedWardId);
+  const currentWard = allWards ? undefined : singleWard || selectableWards[0];
+  const scopeWards = allWards ? selectableWards : currentWard ? [currentWard] : [];
+  const scopeWardIds = scopeWards.map(w => w.id), scopeWardKey = scopeWardIds.join(',');
+  const scopeZoneIds = [...new Set(scopeWards.map(w => w.zoneId))], scopeZoneKey = scopeZoneIds.join(',');
+  const currentZone = allWards ? (selectedZoneId === 'all' ? undefined : cityZones.find(z => z.id === selectedZoneId)) : cityZones.find(z => z.id === currentWard?.zoneId);
+  const scopeLabel = allWards ? (currentZone ? `${currentZone.name} · All wards (${scopeWards.length})` : `All wards (${scopeWards.length})`) : currentWard?.name || 'Select ward';
+  const zoneNameOf=(id:string)=>cityZones.find(z=>z.id===id)?.name||'',wardNameOf=(id:string)=>cityWards.find(w=>w.id===id)?.name||'';
+  const scopeZoneName = allWards ? (currentZone?.name || 'All zones') : currentZone?.name;
 
   const [filters,setFilters]=useState(emptyFilters);
   const [figures,setFigures]=useState<ReturnType<typeof summarizeZones>|null>(null),[present,setPresent]=useState<number|null>(null),[issues,setIssues]=useState<number|null>(null),[failed,setFailed]=useState(false),[revision,setRevision]=useState(0);
@@ -66,29 +74,34 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
     const modules=Object.fromEntries(Object.entries(figures.modules).filter(([id])=>moduleIds.includes(id))),rows=Object.values(modules);
     return {...figures,modules,totals:{...figures.totals,target:rows.reduce((n,row)=>n+row.target,0),completed:rows.reduce((n,row)=>n+row.completed,0),targetState:aggregateTargetState(rows)}};
   },[figures,moduleKey]);
-  const wardOutcomes=inspectionOutcomes(coverage.data,{ward:currentWard?.id});
-  const counts=coverageCounts(coverage.data,{ward:currentWard?.id});
-  const metrics=inspectionMetrics(coverage.data,{ward:currentWard?.id},selectedFigures?.totals),delivery=reportTargetDelivery(metrics.delivery,metrics.achieved);
-  const allWardReports=useMemo(()=>currentWard?wardInspectionRows(coverage.data,city.id,currentWard.id,cityZones,cityWards,beats):[],[coverage.data,city.id,currentWard?.id,zones,wards,beats]);
-  const wardReports=allWardReports.filter(r=>matchesFilters(r,filters,[r.assetName,r.submittedByName,currentZone?.name||'',currentWard?.name||'']));
-  const paging=usePagination(wardReports,`${city.id}:${currentWard?.id}:${range.from}:${range.to}:${JSON.stringify(filters)}`);
+  const scoped=useMemo(()=>selectInspectionCoverage(coverage.data,[],scopeWardIds),[coverage.data,scopeWardKey]);
+  const wardOutcomes=inspectionOutcomes(scoped);
+  const counts=coverageCounts(scoped);
+  const metrics=inspectionMetrics(scoped,{},selectedFigures?.totals),delivery=reportTargetDelivery(metrics.delivery,metrics.achieved);
+  const allWardReports=useMemo(()=>scopeWards.length?wardInspectionRows(scoped,city.id,undefined,cityZones,cityWards,beats):[],[scoped,city.id,scopeWardKey,zones,wards,beats]);
+  const wardReports=allWardReports.filter(r=>matchesFilters(r,filters,[r.assetName,r.submittedByName,zoneNameOf(r.zoneId),wardNameOf(r.wardId)]));
+  const paging=usePagination(wardReports,`${city.id}:${scopeWardKey}:${range.from}:${range.to}:${JSON.stringify(filters)}`);
   const historyComplete=!coverage.loading&&counts.inspections!=null;
   const pendingReview=wardOutcomes.rows.find(r=>r.id==='pending_review')?.value;
   const count=(n:number|null|undefined)=>coverage.loading?'Updating':n==null?'Unavailable':n.toLocaleString('en-IN');
-  useEffect(()=>{setFilters(previous=>({...emptyFilters(),moduleId:previous.moduleId,moduleIds:previous.moduleIds}));},[city.id,currentWard?.id,range.from,range.to]);
+  useEffect(()=>{setFilters(previous=>({...emptyFilters(),moduleId:previous.moduleId,moduleIds:previous.moduleIds}));},[city.id,scopeWardKey,range.from,range.to]);
   useEffect(()=>{if(figures){if(matrixStore.getCollection('users').status==='idle')void matrixStore.loadCollection('users');}},[figures]);
-  useEffect(()=>{setFigures(null);setPresent(null);setIssues(null);setFailed(false);if(!currentWard||!currentZone)return;const c=new AbortController(),q=new URLSearchParams({from:range.from,to:range.to,zoneId:currentZone.id,wardId:currentWard.id});
+  useEffect(()=>{setFigures(null);setPresent(null);setIssues(null);setFailed(false);if(!scopeWards.length)return;const c=new AbortController(),q=new URLSearchParams({from:range.from,to:range.to,zoneId:scopeZoneKey,wardId:scopeWardKey});
     const tasks:[string,(d:any)=>void][]=[
-      [`/city/dashboard/zone-export?${new URLSearchParams({from:range.from,to:range.to,zoneIds:currentZone.id,wardIds:currentWard.id})}`,d=>setFigures(summarizeZones(d))],
+      [`/city/dashboard/zone-export?${new URLSearchParams({from:range.from,to:range.to,zoneIds:scopeZoneKey,wardIds:scopeWardKey})}`,d=>setFigures(summarizeZones(d))],
       [`/city/attendance/dashboard?${q}&page=1&pageSize=1`,d=>setPresent(d.summary?.present ?? null)],
       [`/cleanliness-issues/commissioner/summary?${q}`,d=>setIssues(d.kpis?.openIssues ?? null)]
     ];
     const performance=api(`/city/users/daroga-performance?${new URLSearchParams({startDate:new Date(`${range.from}T00:00:00+05:30`).toISOString(),endDate:new Date(`${range.to}T23:59:59.999+05:30`).toISOString(),tzOffset:'-330'})}`,{signal:c.signal});
     void performance.catch(()=>{});
-    tasks[0][1]=d=>{const summary=summarizeZones(d);setFigures(summary);void performance.then(p=>{if(!c.signal.aborted)setFigures(applyPerformanceTargets(summary,p.users||{},currentWard.id));}).catch(()=>{});};
+    tasks[0][1]=d=>{const summary=summarizeZones(d);setFigures(summary);void performance.then(p=>{if(!c.signal.aborted)setFigures(applyPerformanceTargets(summary,p.users||{},scopeWardIds));}).catch(()=>{});};
     for(const [url,apply] of tasks)void api(url,{signal:c.signal}).then(d=>{if(!c.signal.aborted)apply(d);}).catch(()=>{if(!c.signal.aborted)setFailed(true);});return()=>c.abort();
-  },[city.id,currentWard?.id,currentZone?.id,range.from,range.to,revision,matrixStore.loadRevision]);
+  },[city.id,scopeWardKey,scopeZoneKey,range.from,range.to,revision,matrixStore.loadRevision]);
 
+  const unique=(names:(string|undefined)[])=>[...new Set(names.filter(Boolean) as string[])];
+  const darogaOf=(w:Ward)=>users.filter(u=>u.cityId===city.id).find(u => u.id === w.darogaId) || users.find(u=>u.cityId===city.id&&u.role==='SUPERVISOR'&&u.assignedWardIds?.includes(w.id));
+  const inspectorOf=(w:Ward)=>users.filter(u=>u.cityId===city.id).find(u => u.id === w.inspectorId) || users.find(u=>u.cityId===city.id&&u.role==='QC'&&u.assignedWardIds?.includes(w.id));
+  const darogaNames=unique(scopeWards.map(w=>darogaOf(w)?.name)),inspectorNames=unique(scopeWards.map(w=>inspectorOf(w)?.name));
   const daroga = users.filter(u=>u.cityId===city.id).find(u => u.id === currentWard?.darogaId) || users.find(u=>u.cityId===city.id&&u.role==='SUPERVISOR'&&u.assignedWardIds?.includes(currentWard?.id || ''));
   const inspector = users.filter(u=>u.cityId===city.id).find(u => u.id === currentWard?.inspectorId) || users.find(u=>u.cityId===city.id&&u.role==='QC'&&u.assignedWardIds?.includes(currentWard?.id || ''));
 
@@ -106,28 +119,29 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
               Zone Details
             </h1>
             <span className="px-2 py-0.5 text-xs font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 rounded">
-              {currentWard?.name || 'Select ward'}
+              {scopeLabel}
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Inspections, attendance and accountability for {currentWard?.name || 'the selected zone'}.
+            Inspections, attendance and accountability for {scopeLabel}.
           </p>
         </div>
 
         {/* Ward Selector */}
         <div className="flex flex-wrap items-center gap-2">
-          <button className="workspace-secondary-button" disabled={!historyComplete||!wardReports.length} onClick={() => printReports(`${currentWard?.name || city.name} · Inspection Reports`,wardReports)}>Print ward reports with images</button>
+          <button className="workspace-secondary-button" disabled={!historyComplete||!wardReports.length} onClick={() => printReports(`${scopeLabel} · Inspection Reports`,wardReports)}>Print ward reports with images</button>
           <label className="text-xs font-semibold text-slate-700" htmlFor="ward-zone">Zone:</label>
-          <select id="ward-zone" value={selectedZoneId} onChange={e => { setSelectedZoneId(e.target.value); setSelectedWardId(''); }} className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg">
+          <select id="ward-zone" value={selectedZoneId} onChange={e => { setSelectedZoneId(e.target.value); setSelectedWardId(e.target.value === 'all' ? '' : 'all'); }} className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg">
             <option value="all">All zones</option>{cityZones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
           </select>
           <label htmlFor="ward-selector" className="text-xs font-semibold text-slate-700">Ward:</label>
           <select
             id="ward-selector"
-            value={currentWard?.id || ''}
+            value={allWards ? 'all' : currentWard?.id || ''}
             onChange={(e) => setSelectedWardId(e.target.value)}
             className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 font-bold shadow-2xs"
           >
+            <option value="all">{selectedZoneId === 'all' ? 'All wards' : 'All wards in zone'}</option>
             {selectableWards.map(w => (
               <option key={w.id} value={w.id}>{w.name}</option>
             ))}
@@ -136,31 +150,31 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
         </div>
       </div>
 
-      {!currentWard ? <p className="p-6 text-sm text-slate-500">No wards available in this zone.</p> : <>
+      {!scopeWards.length ? <p className="p-6 text-sm text-slate-500">No wards available in this zone.</p> : <>
       {/* Ward Demographic & Officer Profile */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
         <div className="space-y-1">
           <span className="text-slate-400 font-medium uppercase tracking-wider block">Zone</span>
-          <p className="font-bold text-slate-900 text-sm">{currentZone?.name || 'Not supplied'}</p>
-          <p className="text-slate-500 font-mono">{currentWard.areaSqKm>0?`Area: ${currentWard.areaSqKm} sq km`:''}</p>
+          <p className="font-bold text-slate-900 text-sm">{scopeZoneName || 'Not supplied'}</p>
+          <p className="text-slate-500 font-mono">{currentWard&&currentWard.areaSqKm>0?`Area: ${currentWard.areaSqKm} sq km`:''}</p>
         </div>
 
         <div className="space-y-1">
           <span className="text-slate-400 font-medium uppercase tracking-wider block">Ward</span>
-          <p className="font-bold text-slate-900 text-sm font-mono tabular-nums">{currentWard.name}</p>
-          <p className="text-slate-500 font-mono">{currentWard.population>0?`Population: ${currentWard.population.toLocaleString('en-IN')}`:''}</p>
+          <p className="font-bold text-slate-900 text-sm font-mono tabular-nums">{allWards?`${scopeWards.length} wards`:currentWard?.name}</p>
+          <p className="text-slate-500 font-mono">{currentWard&&currentWard.population>0?`Population: ${currentWard.population.toLocaleString('en-IN')}`:''}</p>
         </div>
 
         <div className="space-y-1">
           <span className="text-slate-400 font-medium uppercase tracking-wider block">Assigned Daroga</span>
-          <p className="font-bold text-slate-900 text-sm">{daroga?.name || 'Not assigned'}</p>
-          <p className="text-slate-500 font-mono">{daroga?.phone || 'Not supplied'}</p>
+          <p className="font-bold text-slate-900 text-sm">{allWards?(darogaNames.join(', ')||'Not assigned'):daroga?.name || 'Not assigned'}</p>
+          <p className="text-slate-500 font-mono">{allWards?`${darogaNames.length} assigned`:daroga?.phone || 'Not supplied'}</p>
         </div>
 
         <div className="space-y-1">
           <span className="text-slate-400 font-medium uppercase tracking-wider block">SI</span>
-          <p className="font-bold text-slate-900 text-sm">{inspector?.name || 'Not assigned'}</p>
-          <p className="text-slate-500 font-mono">{inspector?.email || 'Not supplied'}</p>
+          <p className="font-bold text-slate-900 text-sm">{allWards?(inspectorNames.join(', ')||'Not assigned'):inspector?.name || 'Not assigned'}</p>
+          <p className="text-slate-500 font-mono">{allWards?`${inspectorNames.length} assigned`:inspector?.email || 'Not supplied'}</p>
         </div>
       </div>
 
@@ -192,7 +206,7 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
         />
       </div>
 
-      <div className="space-y-5"><OverviewInsights pulse={{pending:0,errors:{}}} data={coverage.data} loading={coverage.loading} ward={currentWard?.id} onInspect={(_module,status)=>setFilters({...filters,status:status||'all'})}/><ChartCard eyebrow="MODULE TARGETS" title="Target credit by module"><BarChart max={100} items={(city.enabledModules??[]).filter(id=>!moduleIds.length||moduleIds.includes(id)).map(id=>{const target=inspectionMetrics(coverage.data,{module:id,ward:currentWard?.id},selectedFigures?.modules[id]).delivery;return {id,label:MODULE_LABELS[id],value:coverage.loading?null:target.percent,display:`${count(target.completed)} / ${count(target.target)}`,detail:inspectionPeriod(coverageCounts(coverage.data,{module:id,ward:currentWard?.id}),target).achievement};})}/></ChartCard></div>
+      <div className="space-y-5"><OverviewInsights pulse={{pending:0,errors:{}}} data={scoped} loading={coverage.loading} onInspect={(_module,status)=>setFilters({...filters,status:status||'all'})}/><ChartCard eyebrow="MODULE TARGETS" title="Target credit by module"><BarChart max={100} items={(city.enabledModules??[]).filter(id=>!moduleIds.length||moduleIds.includes(id)).map(id=>{const target=inspectionMetrics(scoped,{module:id},selectedFigures?.modules[id]).delivery;return {id,label:MODULE_LABELS[id],value:coverage.loading?null:target.percent,display:`${count(target.completed)} / ${count(target.target)}`,detail:inspectionPeriod(coverageCounts(scoped,{module:id}),target).achievement};})}/></ChartCard></div>
       {/* Supporting Report List for this Ward */}
       {failed&&<div className="compact-error">Some ward summaries are unavailable.<button onClick={()=>setRevision(n=>n+1)}>Retry</button></div>}
       <OperationalFilters modules={false} value={filters} onChange={setFilters} users={users.filter(u=>u.cityId===city.id)} statuses={['pending_review','approved','rejected','action_required','action_taken','escalated','unclassified']} resultCount={wardReports.length}/>
@@ -202,7 +216,7 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
             Inspection history ({coverage.loading?'Updating':`${wardReports.length} matching / ${allWardReports.length} available`})
           </span>
           <span className="text-xs text-slate-500 font-mono">
-            {currentZone?.name} / {currentWard.name}
+            {scopeZoneName} / {allWards?`All wards (${scopeWards.length})`:currentWard?.name}
           </span>
         </div>
 
@@ -210,7 +224,7 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
         <div className="divide-y divide-slate-100">
           {coverage.loading ? <div className="p-8 text-center text-sm text-slate-500">Updating inspection records...</div> : wardReports.length === 0 ? (
             <div className="p-8 text-center text-xs text-slate-400">
-              No available inspections match these filters for {currentWard.name}.
+              No available inspections match these filters for {scopeLabel}.
             </div>
           ) : (
             paging.rows.map(rep => (
@@ -223,7 +237,7 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
                       {MODULE_LABELS[rep.moduleId]}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-700 font-medium mt-1">{currentZone?.name || 'Zone name unavailable'} / {currentWard.name}</p>
+                  <p className="text-xs text-slate-700 font-medium mt-1">{zoneNameOf(rep.zoneId) || 'Zone name unavailable'} / {wardNameOf(rep.wardId) || 'Ward name unavailable'}</p>
                   <p className="text-[15px] text-slate-400 font-mono">
                     Logged by {rep.submittedByName || 'Not supplied'} on {rep.inspectionDate} · Score: {coverage.data.compact?'Open report for score':rep.overallScore == null ? 'Not supplied' : `${rep.overallScore}/100`}
                   </p>
