@@ -654,7 +654,7 @@ export const INITIAL_OPERATIONAL_REPORTS: OperationalReport[] = [
       { id: 'tl_b1', timestamp: '2026-10-29 08:10 IST', action: 'Morning Bin Clearance Inspection Submitted', actorName: 'Manoj Tiwari', actorRole: 'Daroga', statusBefore: 'pending_submission', statusAfter: 'pending_review' }
     ]
   },
-  // 4. Nala Report - Action Required (Escalated)
+  // 4. Nala Report - ULB Action Required (Escalated)
   {
     id: 'rep_nal_104',
     reportNumber: 'NAL-2026-1027-02',
@@ -696,7 +696,7 @@ export const INITIAL_OPERATIONAL_REPORTS: OperationalReport[] = [
       { id: 'tl_n3', timestamp: '2026-10-27 14:15 IST', action: 'ULB Officer Escalated to Action Required', actorName: 'Sunil Joshi', actorRole: 'ULB Officer', remarks: 'Urgent desilting notice issued to Zone 1 Engineering & Sanitation squad.', statusBefore: 'rejected', statusAfter: 'action_required' }
     ]
   },
-  // 5. CTU/GVP Transformation Report - Action Taken
+  // 5. CTU/GVP Transformation Report - IEC Action Taken
   {
     id: 'rep_gvp_105',
     reportNumber: 'GVP-2026-1026-03',

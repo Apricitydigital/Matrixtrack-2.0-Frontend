@@ -13,7 +13,7 @@ export const COMMISSIONER_TERMS={
   unique:'Unique assets inspected',
   repeated:'Repeat visits',
   coverage:'Coverage %',
-  actionRequired:'Action required',
+  actionRequired:'ULB Action required',
   actionPending:'Action pending',
-  actionTaken:'Action taken',
+  actionTaken:'IEC Action taken',
 } as const;

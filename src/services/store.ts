@@ -261,7 +261,7 @@ class MatrixStore {
     const report = this.getReportById(id);
     if (!report) throw new Error('Report not found.');
     if(!this.currentUser || !this.hasCapability(this.currentUser,'escalateOperationalReport',report.cityId))throw new Error('This account cannot request corrective action.');
-    if(!['pending_review','approved','rejected'].includes(report.status))throw new Error('Action Required is available only on Pending, Approved or Rejected reports.');
+    if(!['pending_review','approved','rejected'].includes(report.status))throw new Error('ULB Action Required is available only on Pending, Approved or Rejected reports.');
     if(!reason.trim())throw new Error('Enter the reason for corrective action.');
     if(report.moduleId==='toilets')return this.mutate(`/modules/toilet/inspections/${report.backendId}/review`,'POST',{status:'ACTION_REQUIRED',comment:reason});
     if(report.moduleId==='ctu_gvp')return this.mutate(`/modules/taskforce/reports/${report.backendId}/action-required`,'POST',{remarks:reason,ulbRemark:reason});

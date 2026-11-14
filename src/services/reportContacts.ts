@@ -33,6 +33,6 @@ export function reportContacts(report:OperationalReport,users:User[]):Contact[] 
 }
 export function reportStage(report:OperationalReport){
   const role=report.currentOwnerRole || ({pending_review:'QC',approved:'ULB_OFFICER',rejected:'ULB_OFFICER',action_required:'ACTION_OFFICER',action_taken:'ULB_OFFICER',escalated:'ULB_OFFICER'}[report.status]);
-  return {role,since:report.stageSince || report.reviewedAt || report.submittedAt,label:({pending_review:'Pending SI review',approved:'SI approved · ULB oversight',rejected:'SI rejected · ULB oversight',action_required:'Action required (pending)',action_taken:'Action submitted · verification pending',escalated:'Escalated for review'}[report.status])};
+  return {role,since:report.stageSince || report.reviewedAt || report.submittedAt,label:({pending_review:'Pending SI review',approved:'SI approved · ULB oversight',rejected:'SI rejected · ULB oversight',action_required:'ULB Action required (pending)',action_taken:'Action submitted · verification pending',escalated:'Escalated for review'}[report.status])};
 }
 export const telephone=(phone:string)=>/^\+?[\d\s()-]{6,25}$/.test(phone)?`tel:${phone.replace(/[^\d+]/g,'')}`:undefined;

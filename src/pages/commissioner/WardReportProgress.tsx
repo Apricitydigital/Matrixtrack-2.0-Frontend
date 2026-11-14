@@ -18,7 +18,7 @@ export function WardReportProgress({data,wards,targetRows,targetsReady,loading,o
   const number=(value:number|null)=>loading?'Updating':count(value);
   const visual=useVisual();
   return <section className="home-section ward-overview"><div className="home-section-heading"><div><span>WARD FOLLOW-UP</span><h2>Ward performance</h2><p>Submitted reports against the inspection target for the selected dates and modules.</p></div></div>
-    <div className="zone-table-wrap"><table className="zone-delivery-table"><thead><tr><th>Ward</th><th>Total assets</th><th>Inspection target</th><th>Reports received</th><th>Reports still needed</th><th>Report target progress</th><th>Coverage</th><th>Pending review</th><th>Cleaned</th><th>Not cleaned</th><th>Action required</th><th>Action taken</th></tr></thead><tbody>{paging.rows.map(ward=>{
+    <div className="zone-table-wrap"><table className="zone-delivery-table"><thead><tr><th>Ward</th><th>Total assets</th><th>Inspection target</th><th>Reports received</th><th>Reports still needed</th><th>Report target progress</th><th>Coverage</th><th>Pending review</th><th>Cleaned</th><th>Not cleaned</th><th>ULB Action required</th><th>IEC Action taken</th></tr></thead><tbody>{paging.rows.map(ward=>{
       const scope={zone:ward.zoneId,ward:ward.id},metrics=inspectionMetrics(data,scope);
       const rows=targetRows.filter(row=>row.wardId===ward.id),configured=rows.some(row=>row.source==='ADMIN');
       const source={target:rows.reduce((n,row)=>n+row.target,0),completed:rows.reduce((n,row)=>n+row.credit,0),targetState:configured?'configured' as const:'default' as const};

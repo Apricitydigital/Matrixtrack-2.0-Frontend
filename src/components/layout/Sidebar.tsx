@@ -117,7 +117,7 @@ export function getNavGroups(currentRole: RoleType, pendingRequestCount = 0, ope
               { id: 'ca_dashboard', label: 'City Administration', icon: LayoutDashboard },
               { id: 'ca_map', label: 'City Operations Map', icon: Map },
               { id: 'ca_daily_reports', label: 'Inspection Reports', icon: FileText },
-              { id: 'ca_attention', label: 'Action Required', icon: AlertCircle }
+              { id: 'ca_attention', label: 'ULB Action Required', icon: AlertCircle }
             ]
           },
           {

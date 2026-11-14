@@ -24,7 +24,7 @@ export function CityProgress({city,users,onNavigate}:{city:City;users:User[];onN
   {label:'Inspections completed',value:metrics.achieved,loading:coverage.loading,detail:format(metrics.totalRecords)+' total inspection records',info:'Completed inspections in the selected dates. Repeat visits count as inspections; each report has one current status.'},
   {label:'Inspection target',value:metrics.delivery.target,loading:targetLoading,detail:metrics.delivery.fallback?'One inspection per asset per day':'Configured target',info:metrics.delivery.fallback?'Current registered assets × selected calendar days. Daily target credit counts each registered asset once per day. '+format(metrics.delivery.completed)+' visits credited.':'Configured target and credited inspections use the same backend target windows as the Commissioner dashboard. '+format(metrics.delivery.completed)+' inspections credited.'},
   {label:'Pending review',value:count('pending_review'),loading:coverage.loading,detail:'Awaiting inspection review',info:'Reports currently awaiting review, submitted within the selected dates. This is separate from inspections still required to meet the target.'},
-  {label:'Action required',value:count('action_required'),loading:coverage.loading,detail:'Current report status',info:'Reports submitted within the selected dates whose current status requires corrective action.'}
+  {label:'ULB Action required',value:count('action_required'),loading:coverage.loading,detail:'Current report status',info:'Reports submitted within the selected dates whose current status requires corrective action.'}
  ];
  const errors=[...coverage.data.errors,...Object.values(pulse.errors)];
  return <section className="space-y-5">

@@ -106,7 +106,7 @@ export const ExecutiveSummaryReport: React.FC<ExecutiveSummaryReportProps> = ({
             <span className="text-xl font-bold text-rose-700 tabular-nums">{rejected}</span>
           </div>
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
-            <span className="text-[15px] text-slate-500 block uppercase font-sans">Action Required</span>
+            <span className="text-[15px] text-slate-500 block uppercase font-sans">ULB Action Required</span>
             <span className="text-xl font-bold text-amber-700 tabular-nums">{actionReq}</span>
           </div>
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">

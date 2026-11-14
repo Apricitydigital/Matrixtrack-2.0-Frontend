@@ -2,8 +2,8 @@ export const INSPECTION_STATUSES = [
   {id:'approved',label:'Cleaned',tone:'green'},
   {id:'pending_review',label:'Pending review',tone:'yellow'},
   {id:'rejected',label:'Not cleaned',tone:'red'},
-  {id:'action_required',label:'Action required',tone:'red'},
-  {id:'action_taken',label:'Action taken',tone:'yellow'},
+  {id:'action_required',label:'ULB Action required',tone:'red'},
+  {id:'action_taken',label:'IEC Action taken',tone:'yellow'},
   {id:'escalated',label:'Escalated',tone:'red'},
   {id:'unclassified',label:'Pending review',tone:'neutral'},
 ] as const;

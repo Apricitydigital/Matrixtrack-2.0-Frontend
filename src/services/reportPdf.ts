@@ -25,8 +25,8 @@ export const STATUS = [
   {key: 'cleaned', id: 'approved', label: 'Cleaned', color: C.green},
   {key: 'notCleaned', id: 'rejected', label: 'Not cleaned', color: C.red},
   {key: 'siPending', id: 'pending_review', label: 'Pending review', color: C.amber},
-  {key: 'actionRequired', id: 'action_required', label: 'Action required', color: C.orange},
-  {key: 'actionTaken', id: 'action_taken', label: 'Action taken', color: C.blue},
+  {key: 'actionRequired', id: 'action_required', label: 'ULB Action required', color: C.orange},
+  {key: 'actionTaken', id: 'action_taken', label: 'IEC Action taken', color: C.blue},
   {key: 'escalated', id: 'escalated', label: 'Escalated', color: C.violet},
 ] as const;
 const progressColor = (p:number | null) => p == null ? C.grey : p >= 100 ? C.green : p >= 60 ? C.aqua : p >= 30 ? C.blue : C.orange;
