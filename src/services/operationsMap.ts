@@ -1,4 +1,6 @@
 import type { OperationalModuleId } from '../types';
+import {canonicalModuleKey} from './moduleKeys';
+import {personnelAssignedToWard,personnelScope} from './personnelScope';
 export interface MapAsset {key:string;id:string;module:OperationalModuleId;name:string;state:string;zoneId:string;wardId:string;zoneName:string;wardName:string;reportId?:string;coordinates?:[number,number];geometry?:any;actors:any[];supervisors:any[];employees:any[];workflow?:any;address?:string;reportedSegments?:number;totalSegments?:number;}
 export const MODULE_COLORS:Record<OperationalModuleId,string>={sweeping:'#3a76b8',toilets:'#8a6cc0',litter_bins:'#d59348',nala:'#2b9aa4',ctu_gvp:'#55a581'};
 const BOUNDARY_COLORS=['#4f46e5','#0891b2','#b45309','#7c3aed'];
@@ -8,6 +10,28 @@ export function boundaryColor(id:string):string {
 }
 export type MapTeamRole='EMPLOYEE'|'SUPERVISOR';
 export interface MapTeamPerson {id:string;name:string;role:MapTeamRole;locationKeys:string[];modules:OperationalModuleId[];}
+export interface MapPersonnel {id:string;cityId:string;name:string;role:MapTeamRole;zoneIds:string[];wardIds:string[];modules:{key:string;zoneIds:string[];wardIds:string[]}[];}
+const MAP_MODULE_KEYS:Record<OperationalModuleId,string>={sweeping:'SWEEPING',toilets:'TOILET',litter_bins:'LITTERBINS',nala:'NALA',ctu_gvp:'TASKFORCE'};
+/** Directory totals use exactly the personnel screen's scope rules, independently of asset links. */
+export function mapPersonnelTeam(directory:MapPersonnel[],assets:MapAsset[],scope:{cityId:string;zone:string;ward:string;modules:string[];wards:{id:string;zoneId:string}[]}):MapTeamPerson[]{
+  const linked=new Map(mapAssignedPeople(assets).map(p=>[`${p.role}:${p.id}`,p]));
+  const allModules=Object.keys(MAP_MODULE_KEYS).every(key=>scope.modules.includes(key));
+  const chosenKeys=new Set(scope.modules.map(key=>MAP_MODULE_KEYS[key]));
+  const people=new Map<string,MapTeamPerson>();
+  for(const person of directory){
+    if(person.cityId!==scope.cityId||!['EMPLOYEE','SUPERVISOR'].includes(person.role))continue;
+    const modules=(person.modules||[]).filter(m=>allModules||chosenKeys.has(canonicalModuleKey(m.key)));
+    if(!allModules&&!modules.length)continue;
+    const user={assignedZoneIds:allModules?person.zoneIds:modules.flatMap(m=>m.zoneIds.length?m.zoneIds:person.zoneIds),assignedWardIds:allModules?person.wardIds:modules.flatMap(m=>m.wardIds.length?m.wardIds:person.wardIds),moduleAssignments:modules};
+    const geography=personnelScope(user,scope.wards);
+    if(scope.zone&&!geography.zoneIds.includes(scope.zone))continue;
+    const ward=scope.wards.find(w=>w.id===scope.ward);
+    if(scope.ward&&(!ward||!personnelAssignedToWard(user,ward)))continue;
+    const key=`${person.role}:${person.id}`,assignment=linked.get(key);
+    people.set(key,{id:person.id,name:person.name,role:person.role,locationKeys:assignment?.locationKeys||[],modules:(Object.keys(MAP_MODULE_KEYS) as OperationalModuleId[]).filter(key=>modules.some(m=>canonicalModuleKey(m.key)===MAP_MODULE_KEYS[key]))});
+  }
+  return [...people.values()].sort((a,b)=>a.name.localeCompare(b.name)||a.id.localeCompare(b.id));
+}
 /** Assignment arrays are authoritative; report actors may include former assignees and reviewers. */
 export function mapAssignedPeople(assets:MapAsset[]):MapTeamPerson[]{
   const people=new Map<string,MapTeamPerson>();
