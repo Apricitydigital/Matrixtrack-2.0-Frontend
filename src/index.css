@@ -7,6 +7,7 @@
 @import "./styles/plant-details.css";
 @import "./styles/performance-clarity.css";
 @import "./styles/report-compact.css";
+@import "./styles/attendance-reconciliation.css";
 
 @theme {
   --text-xs: 0.75rem;

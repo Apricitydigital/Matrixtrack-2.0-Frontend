@@ -20,6 +20,8 @@ const {ModuleDelivery}=require('../src/pages/commissioner/ModuleDelivery.tsx');
 const {ReportsExports}=require('../src/pages/commissioner/ReportsExports.tsx');
 const {ReportDataReview}=require('../src/pages/commissioner/ReportDataReview.tsx');
 const {ZoneWardDetails}=require('../src/pages/commissioner/ZoneWardDetails.tsx');
+const {WardRankingPage}=require('../src/pages/cityadmin/WardRankingPage.tsx');
+const {WardRankingInsights}=require('../src/pages/commissioner/WardRankingInsights.tsx');
 const pairs=[[1,[12,10,11,13]],[2,[20,4,6]],[3,[23,33]],[4,[44,52]],[5,[38,40]],[6,[35,48]]];
 const zones=[...pairs.map(([n])=>({id:`z${n}`,cityId:'c',zoneNumber:n,name:`Zone ${n}`})),{id:'z7',cityId:'c',zoneNumber:7,name:'Zone 7'}];
 const wards=[...pairs.flatMap(([z,ns])=>ns.map(n=>({id:`w${n}`,cityId:'c',zoneId:`z${z}`,wardNumber:n,name:`Ward ${n}`}))),{id:'extra',cityId:'c',zoneId:'z1',wardNumber:99,name:'Ward 99'},{id:'outside',cityId:'c',zoneId:'z7',wardNumber:100,name:'Ward 100'}];
@@ -35,15 +37,38 @@ const users={u:{performance:2.4,rows:wards.flatMap(w=>['SWEEPING','TOILET'].map(
 const props={city,zones,wards,reports:[],currentUser:{id:'comm',role:'COMMISSIONER'},noticeRequest:0,onNavigate:()=>{},onSelectReport:()=>{},onInspect:()=>{},onNoticeCount:()=>{}};
 
 function find(node,predicate){if(!node||typeof node!=='object')return undefined;if(predicate(node))return node;for(const child of React.Children.toArray(node.props?.children)){const result=find(child,predicate);if(result)return result;}}
-function harness(){
+function harness(initialSlots=[]){
  const originals={useState:React.useState,useEffect:React.useEffect,useRef:React.useRef,useMemo:React.useMemo,useCallback:React.useCallback};
- const savedCoverage=coverageHook.useInspectionCoverage,savedPulse=commissioner.useCityPulse,savedRange=matrixStore.getDateRange,slots=[];
+ const savedCoverage=coverageHook.useInspectionCoverage,savedPulse=commissioner.useCityPulse,savedRange=matrixStore.getDateRange,slots=[...initialSlots];
  coverageHook.useInspectionCoverage=()=>({loading:false,data});
  commissioner.useCityPulse=()=>({pending:0,errors:{},official:{totals:{target:99999},zones:[],modules:{}},performance:{SUPERVISOR:users,QC:{si:{performance:99}},ACTION_OFFICER:{iec:{performance:99}}},rankings:[]});
  matrixStore.getDateRange=()=>({from:data.from,to:data.to});
  return {render(component=CommissionerHome,values=props){let index=0;React.useState=initial=>{const at=index++;if(!(at in slots))slots[at]=typeof initial==='function'?initial():initial;return [slots[at],value=>{slots[at]=typeof value==='function'?value(slots[at]):value;}];};React.useEffect=()=>{};React.useRef=()=>({current:null});React.useMemo=fn=>fn();React.useCallback=fn=>fn;
   try{return component(values);}finally{Object.assign(React,originals);}},close(){Object.assign(React,originals);coverageHook.useInspectionCoverage=savedCoverage;commissioner.useCityPulse=savedPulse;matrixStore.getDateRange=savedRange;}};
 }
+
+test('loaded ward rankings render for every role and retain focus filtering',()=>{
+ const rows=wards.map((w,i)=>({wardId:w.id,wardName:w.name,zoneId:w.zoneId,zoneName:zones.find(z=>z.id===w.zoneId).name,cityRank:i+1,finalScore:80,performanceBand:'GREEN'}));
+ const saved={currentUser:matrixStore.currentUser,getZones:matrixStore.getZones,getWards:matrixStore.getWards};
+ matrixStore.getZones=()=>zones;matrixStore.getWards=()=>wards;
+ try{
+  for(const role of ['COMMISSIONER','ULB_OFFICER','CITY_ADMIN','HMS_SUPER_ADMIN','SUPERVISOR']){
+   matrixStore.currentUser={id:'user',cityId:city.id,role};
+   const h=harness([rows,'',false]);
+   try{
+    let tree=h.render(WardRankingPage,{city});
+    if(role!=='SUPERVISOR'){assert.equal(tree.type,WardRankingInsights);assert.deepEqual(tree.props.rows,rows);continue;}
+    find(tree,n=>n.props?.noun==='wards'&&n.props.onSize).props.onSize(50);
+    tree=h.render(WardRankingPage,{city});
+    assert.match(renderToStaticMarkup(tree),/>Ward 99</);
+    find(tree,n=>n.props?.['aria-label']==='Ranking zone').props.onChange({target:{value:'__focus_wards'}});
+    tree=h.render(WardRankingPage,{city});
+    const html=renderToStaticMarkup(tree);
+    assert.match(html,/>Ward 12</);assert.doesNotMatch(html,/>Ward 99<|>Ward 100</);
+   }finally{h.close();}
+  }
+ }finally{Object.assign(matrixStore,saved);}
+});
 
 test('Commissioner 6-zone/15-ward shortcut reconciles configured targets, grouped reports and team progress',()=>{
  const h=harness();try{

@@ -24,8 +24,8 @@ export function WardRankingPage({ city }: Props) {
     setConfig(null);api(`/ward-ranking?from=${from}&to=${to}`,{signal:controller.signal}).then(data => {if(!controller.signal.aborted){setRows(data.rankings || []);setConfig(data.config);}}).catch(e => {if(!controller.signal.aborted)setError(e.message);}).finally(() => {if(!controller.signal.aborted)setLoading(false);});
     return () => controller.abort();
   },[city.id,matrixStore.loadRevision,retry]);
-  const filtered = rows.filter(r => (!search || `${r.wardName} ${r.zoneName}`.toLowerCase().includes(search.toLowerCase())) && matchesZoneChoice(zone, focus, r.zoneId, r.wardId) && (band === 'all' || statusTone(r.rankable === false ? 'not_assessed' : r.performanceBand || '') === band));
   const focus = wardFocusPreset(city.id, matrixStore.getZones(city.id), matrixStore.getWards(city.id));
+  const filtered = rows.filter(r => (!search || `${r.wardName} ${r.zoneName}`.toLowerCase().includes(search.toLowerCase())) && matchesZoneChoice(zone, focus, r.zoneId, r.wardId) && (band === 'all' || statusTone(r.rankable === false ? 'not_assessed' : r.performanceBand || '') === band));
   const zones = [...new Map(rows.filter(r => r.zoneId).map(r => [r.zoneId,r.zoneName])).entries()].sort((a,b)=>naturalCompare(a[1],b[1]));
   const paging = usePagination(filtered, search + zone + band + city.id + matrixStore.loadRevision);
   if(['COMMISSIONER','ULB_OFFICER','CITY_ADMIN','HMS_SUPER_ADMIN'].includes(matrixStore.currentUser?.role || ''))return <WardRankingInsights city={city} rows={rows} config={config} loading={loading} error={error} onRetry={()=>setRetry(n=>n+1)}/>;

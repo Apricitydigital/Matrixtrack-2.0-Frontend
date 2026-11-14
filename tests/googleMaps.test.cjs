@@ -58,3 +58,22 @@ test('selecting a person focuses assigned assets while keeping zone and ward ove
   assert.deepEqual(f.map.center,{lat:23.5,lng:75.5});assert.equal(f.map.bounds,undefined);assert.equal(f.layers[1].features.length,2);assert.equal(f.layers[1].style(f.layers[1].features[0]).strokeWeight,4);assert.equal(f.layers[1].style(f.layers[1].features[1]).strokeWeight,2);dispose();
  }finally{global.document=saved;}
 });
+
+test('initial map frames selected wards without distant asset pins widening the city view',()=>{
+ const saved=global.document,f=scene();global.document=f.document;
+ const {renderGoogleMap,mapEntries,initialMapFocusPoints}=require('../src/services/googleMapRenderer.ts');
+ const asset=(id,coordinates)=>({key:id,id,module:'sweeping',name:id,state:'APPROVED',coordinates,actors:[],supervisors:[],employees:[]});
+ const entries=mapEntries([asset('local',[23.18,75.78]),asset('distant',[23.7,75.0])]);
+ const ward={id:'ward',name:'Ward',level:'ward',geometry:{type:'Polygon',coordinates:[[[75.77,23.17],[75.79,23.17],[75.79,23.19],[75.77,23.17]]]}};
+ const zone={id:'zone',name:'Zone',level:'zone',geometry:{type:'Polygon',coordinates:[[[75.6,23],[76,23],[76,23.4],[75.6,23]]]}};
+ try{
+  const dispose=renderGoogleMap(f.maps,f.map,entries,[zone,ward],()=>{});
+  assert.equal(f.map.bounds.points.length,4);
+  assert.ok(f.map.bounds.points.every(p=>p.lng>=75.77&&p.lng<=75.79));
+  assert.equal(f.nodes.length,2,'Distant records must remain rendered and selectable');
+  assert.deepEqual(initialMapFocusPoints(entries,[zone]),[[23,75.6],[23,76],[23.4,76],[23,75.6]]);
+  assert.deepEqual(initialMapFocusPoints([], [ward]),[[23.17,75.77],[23.17,75.79],[23.19,75.79],[23.17,75.77]]);
+  assert.deepEqual(initialMapFocusPoints(entries,[]),entries.map(e=>e.point));
+  dispose();
+ }finally{global.document=saved;}
+});

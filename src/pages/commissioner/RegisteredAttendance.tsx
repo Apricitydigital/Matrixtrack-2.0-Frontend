@@ -1,0 +1,64 @@
+import React,{useEffect,useMemo,useState} from 'react';
+import {ArrowRight,CalendarDays,CheckCheck,Download,RefreshCw,Search,ShieldCheck,Users,UserRoundSearch,TriangleAlert} from 'lucide-react';
+import type {City,Ward,Zone} from '../../types';
+import {api,todayIST} from '../../services/api';
+import {matrixStore} from '../../services/store';
+import {Pagination,usePagination} from '../../components/common/Pagination';
+import {downloadAuditWorkbook} from '../../services/spreadsheets';
+import {matchLabels,reconciliationCounts,reconciliationSheets,type ReconciliationData} from '../../services/attendanceReconciliation';
+import {naturalCompare} from '../../services/wardRankingEvidence';
+
+const time=(value:string|null)=>value?new Date(value).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kolkata'}):'—';
+export function RegisteredAttendance({city,zones,wards}:{city:City;zones:Zone[];wards:Ward[]}) {
+  const [date,setDate]=useState(''),[zone,setZone]=useState(''),[ward,setWard]=useState(''),[search,setSearch]=useState(''),[view,setView]=useState('matched');
+  const [data,setData]=useState<(ReconciliationData&{requestKey:string})|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[retry,setRetry]=useState(0),[exporting,setExporting]=useState(false),[exportError,setExportError]=useState('');
+  const requestKey=JSON.stringify([city.id,date,retry,matrixStore.loadRevision]);
+  useEffect(()=>{
+    const c=new AbortController();setLoading(true);setError('');setData(null);setExportError('');
+    const q=new URLSearchParams({cityId:city.id,...(date?{date}:{})});
+    api(`/city/attendance/reconciliation?${q}`,{signal:c.signal}).then(d=>{if(!c.signal.aborted)setData({...d,requestKey});}).catch(e=>{if(!c.signal.aborted)setError(e.message);}).finally(()=>{if(!c.signal.aborted)setLoading(false);});
+    return()=>c.abort();
+  },[city.id,date,retry,matrixStore.loadRevision]);
+  const valid=data?.requestKey===requestKey&&data.cityId===city.id&&(!date||data.date===date)?data:null;
+  const scoped=useMemo(()=>(valid?.employees||[]).filter(r=>(!zone||r.zoneIds.includes(zone))&&(!ward||r.wardIds.includes(ward))&&(!search||`${r.name} ${r.employeeId} ${r.attendanceId||''}`.toLowerCase().includes(search.trim().toLowerCase()))),[valid,zone,ward,search]);
+  const counts=reconciliationCounts(scoped),rows=scoped.filter(r=>view==='all'||(view==='location'?r.locationStatus==='mismatch':r.state===view));
+  const paging=usePagination(rows,[city.id,date,zone,ward,search,view,retry,matrixStore.loadRevision].join('|'));
+  const wardRows=wards.filter(w=>w.cityId===city.id&&(!zone||w.zoneId===zone)&&(!ward||w.id===ward)).map(w=>({...w,...reconciliationCounts(scoped.filter(r=>r.wardIds.includes(w.id)))})).filter(w=>w.registered).sort((a,b)=>naturalCompare(a.name,b.name));
+  const unassigned=scoped.filter(r=>!r.wardIds.length).length;
+  const available=Boolean(valid?.hasAttendanceData),dateLabel=valid?.date||date||'No data received';
+  const exportRows=async(missingOnly=false)=>{
+    if(!valid?.date||!available)return;
+    setExporting(true);setExportError('');
+    try {
+      const scope=[zone?zones.find(z=>z.id===zone)?.name:'All zones',ward?wards.find(w=>w.id===ward)?.name:'All wards',search?`Search: ${search}`:'',missingOnly?'Attendance not found':view==='all'?'All employees':view==='location'?'Location differences':matchLabels[view as keyof typeof matchLabels]].filter(Boolean).join(' / ');
+      const selection=missingOnly?scoped:rows;
+      const sheets=reconciliationSheets(city.name,valid.date,selection,scope);
+      await downloadAuditWorkbook(`attendance-${missingOnly?'not-found':'reconciliation'}-${city.cityCode}-${valid.date}.xlsx`,missingOnly?sheets.filter(s=>['Scope and totals','Attendance not found'].includes(s.name)):sheets);
+    }catch(e){setExportError(e instanceof Error?e.message:'Export could not be prepared.');}finally{setExporting(false);}
+  };
+  const chooseWard=(id:string,result='all')=>{setWard(id);setView(result);document.getElementById('registered-attendance-register')?.scrollIntoView({behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});};
+  return <section className="commissioner-workspace reconciliation space-y-5">
+    <div className="commissioner-heading"><div><div className="commissioner-kicker"><ShieldCheck size={16}/>REGISTERED WORKFORCE · {city.name}</div><h1>Attendance matched with registered employees</h1><p>See whose attendance was received and who needs a follow-up.</p></div><div className="commissioner-actions"><button disabled={!available||!counts.missing||exporting||loading} onClick={()=>void exportRows(true)}><Download size={15}/>Download missing employees</button><button className="dark" disabled={!available||!rows.length||exporting||loading} onClick={()=>void exportRows()}><Download size={15}/>{exporting?'Preparing Excel…':'Export this view'}</button></div></div>
+    <div className="recon-date workspace-panel"><div><CalendarDays size={23}/><div><strong>{dateLabel}</strong><p>Daily reconciliation against current employee registrations</p></div></div><div><label>Attendance date<input aria-label="Reconciliation date" type="date" max={todayIST()} value={date||valid?.date||''} onChange={e=>setDate(e.target.value)}/></label><button className="workspace-secondary-button" onClick={()=>{setDate('');setRetry(n=>n+1);}}><RefreshCw size={14}/>Latest received</button></div></div>
+    <div className="ops-filter-panel recon-filters"><label><span>Search employee</span><div className="attendance-search"><Search size={15}/><input aria-label="Search registered attendance" placeholder="Name or Employee ID" value={search} onChange={e=>setSearch(e.target.value)}/></div></label><label><span>Registered zone</span><select aria-label="Registered attendance zone" value={zone} onChange={e=>{setZone(e.target.value);setWard('');}}><option value="">All zones</option>{zones.filter(z=>z.cityId===city.id).sort((a,b)=>naturalCompare(a.name,b.name)).map(z=><option key={z.id} value={z.id}>{z.name}</option>)}</select></label><label><span>Registered ward</span><select aria-label="Registered attendance ward" value={ward} onChange={e=>setWard(e.target.value)}><option value="">All wards</option>{wards.filter(w=>w.cityId===city.id&&(!zone||w.zoneId===zone)).sort((a,b)=>naturalCompare(a.name,b.name)).map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label><button className="ops-reset" onClick={()=>{setSearch('');setZone('');setWard('');setView('matched');}}>Reset filters</button></div>
+    {loading&&<div role="status" className="analytics-empty">Matching registered employees with the attendance sheet…</div>}
+    {error&&<div role="alert" className="compact-error">Attendance reconciliation could not be loaded. <button onClick={()=>setRetry(n=>n+1)}>Retry</button><details><summary>Details</summary>{error}</details></div>}
+    {exportError&&<p role="alert" className="compact-error">{exportError}</p>}
+    {!loading&&!error&&valid&&<>
+      {!available&&<div className="recon-notice"><CalendarDays size={22}/><div><strong>No attendance sheet records received for this date</strong><p>Choose another date. Employees are not marked missing or absent while source data is unavailable.</p></div></div>}
+      <div className="recon-kpis">{[
+        {label:'Registered employees',value:counts.registered,key:'all',icon:Users,tone:'navy',note:'Current registration in this selection'},
+        {label:'Attendance matched',value:available?counts.matched:null,key:'matched',icon:CheckCheck,tone:'green',note:available?`${counts.present} marked present in the sheet`:'Awaiting attendance sheet'},
+        {label:'Attendance not found',value:available?counts.missing:null,key:'not_found',icon:UserRoundSearch,tone:'amber',note:'Open the list or download Excel'},
+        {label:'Needs review',value:available?counts.review:null,key:'review',icon:TriangleAlert,tone:'purple',note:'Conflicting IDs or multiple sheet rows'},
+      ].map(k=><button key={k.key} data-tone={k.tone} aria-pressed={view===k.key} onClick={()=>setView(k.key)}><span><k.icon size={18}/>{k.label}</span><strong>{k.value??'—'}</strong><small>{k.note}</small><ArrowRight size={17}/></button>)}</div>
+      <div className="recon-notice"><ShieldCheck size={22}/><div><strong>{available?`${counts.matched} matched + ${counts.missing} not found + ${counts.review} to review = ${counts.registered} registered`:'Registration is available; attendance is not yet available'}</strong><p>Match by Employee ID or Aadhaar first / last 8 digits. Names are not used to establish a match. “Not found” does not mean absent. Zone and ward follow current registration.</p></div></div>
+      <section className="workspace-panel"><div className="workspace-panel-heading"><div><span className="workspace-eyebrow">WARD COVERAGE</span><h2>Where attendance is missing</h2><p>Select a count to open its employee list.</p></div><span className="subtle-chip">{wardRows.length} wards</span></div><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr><th>Registered ward / zone</th><th>Registered</th><th>Matched</th><th>Not found</th><th>Needs review</th><th>Match coverage</th></tr></thead><tbody>{wardRows.map(w=><tr key={w.id}><td><strong>{w.name}</strong><small className="block">{zones.find(z=>z.id===w.zoneId)?.name||'Unassigned zone'}</small></td><td><button className="recon-count" onClick={()=>chooseWard(w.id)}>{w.registered}</button></td><td><button className="recon-count" disabled={!available} onClick={()=>chooseWard(w.id,'matched')}>{available?w.matched:'—'}</button></td><td><button className="recon-count recon-missing" disabled={!available} onClick={()=>chooseWard(w.id,'not_found')}>{available?w.missing:'—'}</button></td><td><button className="recon-count" disabled={!available} onClick={()=>chooseWard(w.id,'review')}>{available?w.review:'—'}</button></td><td><div className="recon-coverage"><span><i style={{width:`${available?w.matched/w.registered*100:0}%`}}/></span><b>{available?`${Math.round(w.matched/w.registered*100)}%`:'—'}</b></div></td></tr>)}</tbody></table></div>{!wardRows.length&&<p className="home-empty">No registered wards match this selection.</p>}<p className="recon-footnote">Employees assigned to multiple wards appear in each ward; city totals count each employee once.{unassigned>0?` ${unassigned} employees have no registered ward; find them under All wards.`:''}</p></section>
+      <section className="workspace-panel" id="registered-attendance-register"><div className="workspace-panel-heading"><div><span className="workspace-eyebrow">EMPLOYEE RECONCILIATION</span><h2>{view==='all'?'All registered employees':view==='location'?'Location differences':matchLabels[view as keyof typeof matchLabels]}</h2></div><span className="subtle-chip">{rows.length} employees</span></div>
+        <div className="recon-result-tabs" aria-label="Reconciliation result filters">{[['matched','Matched',counts.matched],['not_found','Not found',counts.missing],['review','Needs review',counts.review],['all','All registered',counts.registered],['location','Location differences',counts.locationMismatch]].map(([id,label,n])=><button key={id} aria-pressed={view===id} onClick={()=>setView(String(id))}>{label}<span>{n}</span></button>)}</div>
+        <div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr><th>Registered employee</th><th>Registered zone / ward</th><th>Match result</th><th>Attendance evidence</th><th>Location check</th></tr></thead><tbody>{paging.rows.map(r=><tr key={r.userId}><td><strong>{r.name}</strong><small className="block">Employee ID: {r.employeeId||'Not recorded'}</small></td><td>{r.zones.join(', ')||'No zone registered'}<small className="block">{r.wards.join(', ')||'No ward registered'}</small></td><td><span className="recon-status" data-state={r.state}>{matchLabels[r.state]}</span><small className="block">{r.matchMethod||r.reason}</small></td><td>{r.state==='matched'?<><strong>{r.status||'Status not supplied'}</strong><small className="block">In {time(r.inTime)} · Out {time(r.outTime)}</small><small className="block">Sheet: {r.attendanceName} · ID {r.attendanceId}</small></>:'—'}</td><td>{r.locationStatus==='mismatch'?<><span className="recon-status" data-state="review">Check location</span><small className="block">{r.locationWarnings.join('; ')}</small></>:r.locationStatus==='consistent'?'Consistent':'Not comparable'}{r.sheetLocation&&<small className="block">Sheet: {r.sheetLocation}</small>}</td></tr>)}</tbody></table></div>
+        {!rows.length&&<div className="home-empty">{view==='not_found'&&available?'All matched or awaiting review — no employees in the not-found list.':'No employees match this view.'}</div>}<Pagination {...paging} noun="employees"/>
+      </section>
+    </>}
+  </section>;
+}

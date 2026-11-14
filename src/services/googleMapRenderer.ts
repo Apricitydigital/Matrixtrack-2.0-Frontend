@@ -10,6 +10,16 @@ const position=(point:[number,number])=>({lat:point[0],lng:point[1]});
 export function mapEntries(assets:MapAsset[]):MapEntry[]{
   return assets.flatMap(asset=>{const geometry=geometryPoints(asset.geometry),point=asset.coordinates&&validCoordinates(...asset.coordinates)?asset.coordinates:geometry[Math.floor(geometry.length/2)];return point?[{key:asset.key,point,asset,geometry}]:[];});
 }
+/** Uploaded geography anchors the initial view; distant asset pins remain available through Fit all. */
+export function initialMapFocusPoints(entries:MapEntry[],boundaries:MapBoundary[],focusAssets=false):[number,number][] {
+  if(!focusAssets){
+    const wards=boundaries.filter(b=>b.level==='ward').flatMap(b=>geometryPoints(b.geometry));
+    if(wards.length)return wards;
+    const points=boundaries.flatMap(b=>geometryPoints(b.geometry));
+    if(points.length)return points;
+  }
+  return cityFocusPoints(entries);
+}
 export function fitGoogleMap(maps:typeof google.maps,map:google.maps.Map,points:[number,number][],maxZoom=16){
   if(!points.length)return;
   if(points.every(p=>p[0]===points[0][0]&&p[1]===points[0][1])){map.setCenter(position(points[0]));map.setZoom(maxZoom);return;}
@@ -90,7 +100,7 @@ export function renderGoogleMap(maps:typeof google.maps,map:google.maps.Map,entr
     }
   };
   renderPins();listeners.push(map.addListener('zoom_changed',renderPins),maps.event.addListenerOnce(map,'idle',renderPins));
-  const focus=!focusAssets&&boundaries.length?[...boundaries.flatMap(b=>geometryPoints(b.geometry)),...entries.map(e=>e.point)]:cityFocusPoints(entries);
+  const focus=initialMapFocusPoints(entries,boundaries,focusAssets);
   const fitListener=fitGoogleMap(maps,map,focus,15);if(fitListener)listeners.push(fitListener);
   return ()=>{listeners.forEach(listener=>listener.remove());pins.forEach(pin=>pin.setMap(null));dashes.forEach(line=>line.setMap(null));routes.setMap(null);borders.setMap(null);tooltip.close();picker.close();};
 }
