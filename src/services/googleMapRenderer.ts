@@ -3,7 +3,7 @@ import {boundaryColor,geometryPoints,validCoordinates,type MapAsset} from './ope
 import {cityFocusPoints,mapClusters} from './mapView';
 import {MODULE_LABELS,statusLabel,statusTone} from './presentation';
 
-export type MapBoundary={id:string;name:string;geometry:any;derived?:boolean;uploadedWardCount?:number;totalWardCount?:number};
+export type MapBoundary={id:string;name:string;geometry:any;derived?:boolean;uploadedWardCount?:number;totalWardCount?:number;level?:'zone'|'ward'};
 export type MapEntry={key:string;point:[number,number];asset:MapAsset;geometry:[number,number][]};
 const tones={red:'#cd626b',yellow:'#c9a04c',green:'#4e9c7e',neutral:'#91a0ad'};
 const position=(point:[number,number])=>({lat:point[0],lng:point[1]});
@@ -31,7 +31,7 @@ function polygonRings(geometry:any):number[][][]{
 }
 
 /** Native Google overlays preserve polygon holes, RYG routes, and accessible clustered pins. */
-export function renderGoogleMap(maps:typeof google.maps,map:google.maps.Map,entries:MapEntry[],boundaries:MapBoundary[],onSelect:(asset:MapAsset)=>void,compact=false){
+export function renderGoogleMap(maps:typeof google.maps,map:google.maps.Map,entries:MapEntry[],boundaries:MapBoundary[],onSelect:(asset:MapAsset)=>void,compact=false,focusAssets=false){
   const routes=new maps.Data({map}),borders=new maps.Data({map}),tooltip=new maps.InfoWindow({disableAutoPan:true}),picker=new maps.InfoWindow();
   const listeners:google.maps.MapsEventListener[]=[],dashes:google.maps.Polyline[]=[];
   const byKey=new Map(entries.map(e=>[e.key,e.asset]));
@@ -41,10 +41,10 @@ export function renderGoogleMap(maps:typeof google.maps,map:google.maps.Map,entr
   }
   listeners.push(routes.addListener('click',(event:google.maps.Data.MouseEvent)=>{const asset=byKey.get(event.feature.getProperty('assetKey') as string);if(asset)onSelect(asset);}));
   const tip=(label:string,where:google.maps.LatLng|null)=>{if(!where)return;const text=document.createElement('span');text.textContent=label;tooltip.setContent(text);tooltip.setPosition(where);tooltip.open({map,shouldFocus:false});};
-  borders.setStyle(feature=>({strokeColor:feature.getProperty('color') as string,fillColor:feature.getProperty('color') as string,strokeWeight:3,strokeOpacity:feature.getProperty('derived')?0:1,fillOpacity:.04,zIndex:1}));
+  borders.setStyle(feature=>({strokeColor:feature.getProperty('color') as string,fillColor:feature.getProperty('color') as string,strokeWeight:feature.getProperty('level')==='zone'?4:2,strokeOpacity:feature.getProperty('derived')?0:1,fillOpacity:.04,zIndex:feature.getProperty('level')==='zone'?2:1}));
   for(const boundary of boundaries){
     const color=boundaryColor(boundary.id),label=boundary.name+(boundary.derived?` (from ${boundary.uploadedWardCount}/${boundary.totalWardCount} wards)`:'');
-    for(const feature of borders.addGeoJson({type:'FeatureCollection',features:featureList(boundary.geometry)})){feature.setProperty('color',color);feature.setProperty('label',label);feature.setProperty('derived',!!boundary.derived);}
+    for(const feature of borders.addGeoJson({type:'FeatureCollection',features:featureList(boundary.geometry)})){feature.setProperty('color',color);feature.setProperty('label',label);feature.setProperty('derived',!!boundary.derived);feature.setProperty('level',boundary.level);}
     if(boundary.derived)for(const ring of polygonRings(boundary.geometry)){
       const line=new maps.Polyline({map,path:ring.map(p=>({lat:p[1],lng:p[0]})),strokeOpacity:0,zIndex:2,icons:[{icon:{path:'M 0,-1 0,1',strokeColor:color,strokeWeight:3,strokeOpacity:1,scale:3},offset:'0',repeat:'12px'}]});
       dashes.push(line);listeners.push(line.addListener('mouseover',(event:google.maps.MapMouseEvent)=>tip(label,event.latLng)),line.addListener('mouseout',()=>tooltip.close()));
@@ -90,7 +90,7 @@ export function renderGoogleMap(maps:typeof google.maps,map:google.maps.Map,entr
     }
   };
   renderPins();listeners.push(map.addListener('zoom_changed',renderPins),maps.event.addListenerOnce(map,'idle',renderPins));
-  const focus=boundaries.length?[...boundaries.flatMap(b=>geometryPoints(b.geometry)),...entries.map(e=>e.point)]:cityFocusPoints(entries);
+  const focus=!focusAssets&&boundaries.length?[...boundaries.flatMap(b=>geometryPoints(b.geometry)),...entries.map(e=>e.point)]:cityFocusPoints(entries);
   const fitListener=fitGoogleMap(maps,map,focus,15);if(fitListener)listeners.push(fitListener);
   return ()=>{listeners.forEach(listener=>listener.remove());pins.forEach(pin=>pin.setMap(null));dashes.forEach(line=>line.setMap(null));routes.setMap(null);borders.setMap(null);tooltip.close();picker.close();};
 }

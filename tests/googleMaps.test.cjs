@@ -31,7 +31,7 @@ function scene(){
   OverlayView:class{static preventMapHitsAndGesturesFrom(){}setMap(map){this.map=map;if(map){overlays.push(this);this.onAdd();this.draw();}else this.onRemove();}getPanes(){return {overlayMouseTarget:{appendChild:node=>nodes.push(node)}};}getProjection(){return {fromLatLngToDivPixel:()=>({x:10,y:20})};}},
   event:{addListenerOnce:()=>listen()}
  };
- const map={zoom:18,getProjection:()=>({fromLatLngToPoint:p=>({x:p.lng,y:p.lat})}),getZoom(){return this.zoom;},setZoom(zoom){this.zoom=zoom;},setCenter(){},fitBounds(){},addListener:()=>listen()};
+ const map={zoom:18,getProjection:()=>({fromLatLngToPoint:p=>({x:p.lng,y:p.lat})}),getZoom(){return this.zoom;},setZoom(zoom){this.zoom=zoom;},setCenter(center){this.center=center;},fitBounds(bounds){this.bounds=bounds;},addListener:()=>listen()};
  return {maps,map,nodes,layers,overlays,lines,windows,listeners,document:{createElement:element}};
 }
 test('Google overlays preserve holes, stable boundary colors, dashed zones and overlap selection',()=>{
@@ -46,5 +46,15 @@ test('Google overlays preserve holes, stable boundary colors, dashed zones and o
   f.nodes[0].onclick();const box=f.windows[1].content;box.children[1].value='1';box.children[2].onclick();assert.deepEqual(picked,['asset1']);
   f.layers[0].handlers.click({feature:f.layers[0].features[0]});assert.deepEqual(picked,['asset1','asset0']);
   dispose();assert.ok(f.overlays.every(o=>o.map===null));assert.ok(f.layers.every(l=>l.map===null));assert.ok(f.listeners.every(l=>l.removed));
+ }finally{global.document=saved;}
+});
+test('selecting a person focuses assigned assets while keeping zone and ward overlays visible',()=>{
+ const saved=global.document,f=scene();global.document=f.document;
+ const {renderGoogleMap,mapEntries}=require('../src/services/googleMapRenderer.ts');
+ const asset={key:'beat',id:'beat',module:'sweeping',name:'Beat',state:'APPROVED',coordinates:[23.5,75.5],actors:[],supervisors:[],employees:[]};
+ const geometry={type:'Polygon',coordinates:[[[74,22],[77,22],[77,25],[74,25],[74,22]]]},boundaries=[{id:'zone',name:'Zone',level:'zone',geometry},{id:'ward',name:'Ward',level:'ward',geometry}];
+ try{
+  const dispose=renderGoogleMap(f.maps,f.map,mapEntries([asset]),boundaries,()=>{},false,true);
+  assert.deepEqual(f.map.center,{lat:23.5,lng:75.5});assert.equal(f.map.bounds,undefined);assert.equal(f.layers[1].features.length,2);assert.equal(f.layers[1].style(f.layers[1].features[0]).strokeWeight,4);assert.equal(f.layers[1].style(f.layers[1].features[1]).strokeWeight,2);dispose();
  }finally{global.document=saved;}
 });

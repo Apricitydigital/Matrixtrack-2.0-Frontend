@@ -6,7 +6,7 @@ import {fitGoogleMap,mapEntries,renderGoogleMap,type MapBoundary} from '../../se
 export type {MapBoundary} from '../../services/googleMapRenderer';
 const NO_BOUNDARIES:MapBoundary[]=[];
 
-export function CityMap({assets,selected,onSelect,compact=false,boundaries=NO_BOUNDARIES}:{assets:MapAsset[];selected?:string;onSelect:(asset:MapAsset)=>void;compact?:boolean;boundaries?:MapBoundary[]}){
+export function CityMap({assets,selected,onSelect,compact=false,boundaries=NO_BOUNDARIES,focusAssets=false}:{assets:MapAsset[];selected?:string;onSelect:(asset:MapAsset)=>void;compact?:boolean;boundaries?:MapBoundary[];focusAssets?:boolean}){
   const host=useRef<HTMLDivElement>(null),map=useRef<google.maps.Map|null>(null),library=useRef<typeof google.maps|null>(null),onPick=useRef(onSelect);
   const [ready,setReady]=useState(false),[error,setError]=useState('');
   const entries=useMemo(()=>mapEntries(assets),[assets]);onPick.current=onSelect;
@@ -23,8 +23,8 @@ export function CityMap({assets,selected,onSelect,compact=false,boundaries=NO_BO
   },[compact]);
   useEffect(()=>{
     if(!ready||!library.current||!map.current)return;
-    return renderGoogleMap(library.current,map.current,entries,boundaries,asset=>onPick.current(asset),compact);
-  },[entries,boundaries,ready,compact]);
+    return renderGoogleMap(library.current,map.current,entries,boundaries,asset=>onPick.current(asset),compact,focusAssets);
+  },[entries,boundaries,ready,compact,focusAssets]);
   useEffect(()=>{
     const instance=map.current,maps=library.current,entry=entries.find(e=>e.key===selected);if(!ready||!instance||!maps||!entry)return;
     if(entry.geometry.length){const listener=fitGoogleMap(maps,instance,entry.geometry,17);return ()=>listener?.remove();}else{instance.setCenter({lat:entry.point[0],lng:entry.point[1]});instance.setZoom(Math.max(instance.getZoom()||5,17));}
