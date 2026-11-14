@@ -1,6 +1,11 @@
 import type { OperationalModuleId } from '../types';
 export interface MapAsset {key:string;id:string;module:OperationalModuleId;name:string;state:string;zoneId:string;wardId:string;zoneName:string;wardName:string;reportId?:string;coordinates?:[number,number];geometry?:any;actors:any[];supervisors:any[];employees:any[];workflow?:any;address?:string;reportedSegments?:number;totalSegments?:number;}
 export const MODULE_COLORS:Record<OperationalModuleId,string>={sweeping:'#3a76b8',toilets:'#8a6cc0',litter_bins:'#d59348',nala:'#2b9aa4',ctu_gvp:'#55a581'};
+const BOUNDARY_COLORS=['#4f46e5','#0891b2','#b45309','#7c3aed'];
+export function boundaryColor(id:string):string {
+  let hash=0;for(const char of id)hash=(Math.imul(hash,31)+char.charCodeAt(0))>>>0;
+  return BOUNDARY_COLORS[hash%BOUNDARY_COLORS.length];
+}
 export function validCoordinates(lat:unknown,lng:unknown):[number,number]|undefined {
   if(lat===null||lng===null||lat===undefined||lng===undefined||lat===''||lng==='')return;
   const a=Number(lat),b=Number(lng);return Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a)<=90&&Math.abs(b)<=180&&(a!==0||b!==0)?[a,b]:undefined;
