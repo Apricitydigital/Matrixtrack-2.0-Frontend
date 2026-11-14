@@ -1,5 +1,5 @@
 import { intelligenceSuggestion } from './intelligenceSuggestion';
-import { inspectionStatus } from './inspectionStatus';
+import { canonicalModuleKey } from './moduleKeys';
 
 export const DAROGA_WEIGHTS = { inspection: 40, cleaned: 40, attendance: 20 } as const;
 const finite = (n: any): n is number => typeof n === 'number' && Number.isFinite(n);
@@ -9,21 +9,22 @@ const nameKey = (v: any) => String(v || '').toLowerCase().replace(/\s+/g, ' ').t
 export interface CleanedStats { cleaned: number; notCleaned: number; siDecided: number; aiSuggested: number; unassessed: number; total: number; score: number | null }
 
 /** Cleaned vs not cleaned for one Daroga's reports: the SI decision where made, the AI suggestion while the report awaits SI review. */
-export function darogaCleaned(visits: any[], darogaId: string): CleanedStats {
+export function darogaCleaned(visits: any[], darogaId: string, module = 'ALL'): CleanedStats {
   const out: CleanedStats = { cleaned: 0, notCleaned: 0, siDecided: 0, aiSuggested: 0, unassessed: 0, total: 0, score: null };
   const seen = new Set<string>();
   for (const v of visits) {
-    if (seen.has(v.id) || v.raw?.submittedBy?.id !== darogaId) continue;
+    if (seen.has(v.id) || v.raw?.submittedBy?.id !== darogaId || (module !== 'ALL' && canonicalModuleKey(v.module) !== canonicalModuleKey(module))) continue;
     seen.add(v.id); out.total++;
-    const status = inspectionStatus(v.status);
-    if (status === 'approved') { out.cleaned++; out.siDecided++; }
-    else if (['rejected', 'action_required', 'action_taken', 'escalated'].includes(status)) { out.notCleaned++; out.siDecided++; }
-    else if (status === 'pending_review') {
+    // Corrective workflow status does not replace the permanent SI decision.
+    const decision = String(v.raw?.qcDecision || '').toUpperCase();
+    if (decision === 'APPROVED') { out.cleaned++; out.siDecided++; }
+    else if (decision === 'REJECTED') { out.notCleaned++; out.siDecided++; }
+    else {
       const outcome = intelligenceSuggestion({ ...v.raw, status: v.raw?.workspaceStatus || v.status }).outcome;
       if (outcome === 'CLEAN') { out.cleaned++; out.aiSuggested++; }
       else if (outcome === 'NOT_CLEAN') { out.notCleaned++; out.aiSuggested++; }
       else out.unassessed++;
-    } else out.unassessed++;
+    }
   }
   const d = out.cleaned + out.notCleaned;
   out.score = d > 0 ? out.cleaned / d * 100 : null;

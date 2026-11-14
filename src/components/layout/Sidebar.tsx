@@ -55,8 +55,10 @@ interface SidebarProps {
 
 export function canAccessPage(role: RoleType, pageId: string, city?: City): boolean {
   const listed = getNavGroups(role).some(group => group.items.some(item => item.id === pageId));
+    // Queue tabs share Inspection Performance; they remain valid internal ULB views without sidebar entries.
+    const ulbQueueView = role === 'ULB_OFFICER' && ['ulb_pending', 'ulb_approved', 'ulb_rejected', 'ulb_action_req', 'ulb_action_taken'].includes(pageId);
   const superCityView = role === 'HMS_SUPER_ADMIN' && pageId.startsWith('ca_') && getNavGroups('CITY_ADMIN').some(group => group.items.some(item => item.id === pageId));
-  if (!listed && !superCityView) return false;
+    if (!listed && !superCityView && !ulbQueueView) return false;
   if (city && pageId.startsWith('mod_') && !city.enabledModules.includes(pageId.slice(4) as any)) return false;
   const product = ({ prod_swachh: 'swachh_assessment', prod_workforce: 'workforce_monitoring', prod_plant: 'plant_processing', comm_plant: 'plant_processing' } as const)[pageId];
   if (city && product && role !== 'HMS_SUPER_ADMIN' && !city.enabledProducts.includes(product)) return false;
