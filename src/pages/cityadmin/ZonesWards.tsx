@@ -4,6 +4,7 @@ import {Pagination,usePagination} from '../../components/common/Pagination';
 import {downloadWorkbook} from '../../services/spreadsheets';
 import {downloadCsv,generateCsv} from '../../services/csv';
 import {WardImport} from './WardImport';
+import {BoundaryUpload} from './BoundaryUpload';
 import {personnelAssignedToWard} from '../../services/personnel';
 import { matrixStore } from '../../services/store';
 import { Modal } from '../../components/common/Modal';
@@ -30,6 +31,7 @@ export const ZonesWards: React.FC<ZonesWardsProps> = ({
   const [isCreateZoneOpen, setIsCreateZoneOpen] = useState(false);
   const [isCreateWardOpen, setIsCreateWardOpen] = useState(false);
   const [importOpen,setImportOpen]=useState(false);
+  const [boundariesOpen,setBoundariesOpen]=useState(false);
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
 
   // Create Zone state
@@ -104,6 +106,7 @@ export const ZonesWards: React.FC<ZonesWardsProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <button className="workspace-secondary-button" onClick={()=>setBoundariesOpen(true)}>Zone / Ward Boundaries</button>
           <button className="workspace-secondary-button" onClick={()=>setImportOpen(true)}>Import CSV / Excel</button>
           <button
             onClick={() => {setError('');setZoneNumber('');setZoneName('');setIsCreateZoneOpen(true);}}
@@ -188,6 +191,7 @@ export const ZonesWards: React.FC<ZonesWardsProps> = ({
       </div>
 
       {importOpen&&<WardImport cityId={city.id} zones={cityZones} onClose={changed=>{setImportOpen(false);if(changed)void matrixStore.refreshCollections(['geography']);}}/>}
+      {boundariesOpen&&<BoundaryUpload cityId={city.id} onClose={()=>{setBoundariesOpen(false);onRefresh();}}/>}
       {/* Create Zone Modal */}
       {isCreateZoneOpen && (
         <Modal

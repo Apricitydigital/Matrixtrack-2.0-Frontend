@@ -1,11 +1,13 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type * as Leaflet from 'leaflet';
 import { Crosshair, Expand, MapPin } from 'lucide-react';
-import { geometryPoints, validCoordinates, type MapAsset } from '../../services/operationsMap';
+import { boundaryColor, geometryPoints, validCoordinates, type MapAsset } from '../../services/operationsMap';
 import { cityFocusPoints, mapClusters } from '../../services/mapView';
 import { MODULE_LABELS, statusLabel, statusTone } from '../../services/presentation';
 const tones={red:'#cd626b',yellow:'#c9a04c',green:'#4e9c7e',neutral:'#91a0ad'};
-export function CityMap({assets,selected,onSelect,compact=false}:{assets:MapAsset[];selected?:string;onSelect:(asset:MapAsset)=>void;compact?:boolean}) {
+export type MapBoundary={id:string;name:string;geometry:any;derived?:boolean;uploadedWardCount?:number;totalWardCount?:number};
+const NO_BOUNDARIES:MapBoundary[]=[];
+export function CityMap({assets,selected,onSelect,compact=false,boundaries=NO_BOUNDARIES}:{assets:MapAsset[];selected?:string;onSelect:(asset:MapAsset)=>void;compact?:boolean;boundaries?:MapBoundary[]}) {
   const host=useRef<HTMLDivElement>(null),map=useRef<Leaflet.Map|null>(null),library=useRef<typeof Leaflet|null>(null),layers=useRef<Leaflet.FeatureGroup|null>(null),markers=useRef(new Map<string,Leaflet.Layer>()),onPick=useRef(onSelect);
   const [ready,setReady]=useState(false),[error,setError]=useState(''),[tilesFailed,setTilesFailed]=useState(false);
   const entries=useMemo(()=>assets.flatMap(asset=>{const geometry=geometryPoints(asset.geometry);const point=asset.coordinates&&validCoordinates(...asset.coordinates)?asset.coordinates:geometry[Math.floor(geometry.length/2)];return point?[{key:asset.key,point,asset,geometry}]:[];}),[assets]);
@@ -51,9 +53,23 @@ export function CityMap({assets,selected,onSelect,compact=false}:{assets:MapAsse
     return()=>{instance.off('zoomend',render);group.clearLayers();markers.current.clear();if(instance.hasLayer(renderer))instance.removeLayer(renderer);};
   },[entries,ready,compact]);
   useEffect(()=>{
+    const L=library.current,instance=map.current;if(!ready||!L||!instance)return;
+    if(!instance.getPane('boundaries')){const pane=instance.createPane('boundaries');pane.style.zIndex='350';}
+    const group=L.featureGroup().addTo(instance);
+    boundaries.forEach((boundary)=>{
+      const color=boundaryColor(boundary.id);
+      const layer=L.geoJSON(boundary.geometry,{pane:'boundaries',style:{color,weight:3,fillOpacity:.04,dashArray:boundary.derived?'8 4':undefined}}).addTo(group);
+      const tip=document.createElement('span');tip.textContent=boundary.name+(boundary.derived?` (from ${boundary.uploadedWardCount}/${boundary.totalWardCount} wards)`:'');layer.bindTooltip(tip,{sticky:true});
+    });
+    if(boundaries.length&&group.getBounds().isValid()){
+      const bounds=group.getBounds();entries.forEach(e=>bounds.extend(e.point));instance.fitBounds(bounds,{padding:[35,35],maxZoom:15,animate:false});
+    }
+    return()=>{group.remove();};
+  },[boundaries,ready,entries]);
+  useEffect(()=>{
     if(!selected||!map.current)return;const instance=map.current,layer=markers.current.get(selected) as any;if(!layer)return;
     const entry=entries.find(e=>e.key===selected);const frame=requestAnimationFrame(()=>{instance.invalidateSize({pan:false});const animate=!window.matchMedia('(prefers-reduced-motion: reduce)').matches;const bounds=layer.getBounds?.();if(bounds?.isValid())instance.fitBounds(bounds,{padding:[48,48],maxZoom:17,animate});else if(entry)instance.setView(entry.point,Math.max(instance.getZoom(),17),{animate});});return()=>cancelAnimationFrame(frame);
   },[selected,ready,entries]);
-  const fit=()=>{if(entries.length&&library.current)map.current?.fitBounds(library.current.latLngBounds(entries.flatMap(e=>e.geometry.length?e.geometry:[e.point])),{padding:[36,36],maxZoom:16});};
+  const fit=()=>{const points=[...entries.flatMap(e=>e.geometry.length?e.geometry:[e.point]),...boundaries.flatMap(b=>geometryPoints(b.geometry))];if(points.length&&library.current)map.current?.fitBounds(library.current.latLngBounds(points),{padding:[36,36],maxZoom:16});};
   return <div className={`city-map-frame ${compact?'city-map-compact':''}`}><div ref={host} className="city-map-canvas" role="region" aria-label="City map with all module locations"/>{!ready&&!error&&<div className="map-loading"><MapPin size={24}/><span>Opening map...</span></div>}{error&&<div className="map-loading">{error}</div>}{ready&&<div className="map-floating-controls"><button onClick={fit} title="Fit all locations" aria-label="Fit all locations"><Crosshair size={17}/></button>{!compact&&<button aria-label="Toggle full screen map" onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen();else void (host.current?.closest('.map-explorer') || host.current?.parentElement)?.requestFullscreen();}}><Expand size={17}/></button>}</div>}{tilesFailed&&<span className="map-tile-warning">Street tiles unavailable. Locations remain visible.</span>}</div>;
 }
