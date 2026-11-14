@@ -2401,6 +2401,44 @@ function reviewHookHarness(){
  return {render:read=>{index=0;scheduled=[];const value=read();scheduled.forEach(run=>run());return value;},close:()=>{for(const slot of slots)slot?.cleanup?.();Object.assign(React,saved);}};
 }
 
+function boundaryTreeNodes(tree){
+ if(Array.isArray(tree))return tree.flatMap(boundaryTreeNodes);
+ if(!tree||typeof tree!=='object')return [];
+ return [tree,...boundaryTreeNodes(tree.props?.children)];
+}
+test('boundary layers request geometry explicitly and retain geography filters and stable colors',async()=>{
+ const React=require('react'),savedMemo=React.useMemo,apiModule=require('../src/services/api.ts'),savedApi=apiModule.api;
+ const {OperationalMap}=require('../src/components/map/OperationalMap.tsx'),{CityMap}=require('../src/components/map/CityMap.tsx'),{boundaryColor}=require('../src/services/operationsMap.ts');
+ const polygon={type:'Polygon',coordinates:[[[75,23],[76,23],[76,24],[75,24],[75,23]]]};
+ const wards=[{id:'w1',zoneId:'z1',name:'Ward 1',geometry:polygon},{id:'w2',zoneId:'z1',name:'Ward 2',geometry:polygon},{id:'w3',zoneId:'z2',name:'Ward 3',geometry:polygon}];
+ const zones=[{id:'z1',name:'Zone 1',geometry:polygon,derived:true,uploadedWardCount:2,totalWardCount:3},{id:'z2',name:'Zone 2',geometry:polygon}];
+ const calls=[];apiModule.api=async path=>{calls.push(path);return {filters:{zones,wards},boundaries:{zones,wards},beats:[{id:'beat',name:'Beat',latitude:23.5,longitude:75.5,zoneId:'z1',wardId:'w2'}]};};
+ React.useMemo=read=>read();const harness=reviewHookHarness(),read=()=>OperationalMap({reports:[],currentUser:profile,onSelectReport:()=>{}}),flush=()=>new Promise(setImmediate);
+ const find=(tree,match)=>boundaryTreeNodes(tree).find(match),select=(tree,label,value)=>find(tree,n=>n.props?.['aria-label']===label).props.onChange({target:{value}}),map=tree=>find(tree,n=>n.type===CityMap).props;
+ try{
+  let tree=harness.render(read);await flush();tree=harness.render(read);assert.match(calls[0],/includeBoundaries=true/);assert.deepEqual(map(tree).boundaries,[]);assert.equal(map(tree).assets.length,1);
+  select(tree,'Boundary layer','ward');tree=harness.render(read);assert.equal(map(tree).boundaries.length,3);const color=boundaryColor(map(tree).boundaries.find(w=>w.id==='w2').id);
+  select(tree,'Map zone','z1');tree=harness.render(read);assert.deepEqual(map(tree).boundaries.map(w=>w.id),['w1','w2']);select(tree,'Map ward','w2');tree=harness.render(read);assert.deepEqual(map(tree).boundaries.map(w=>w.id),['w2']);assert.equal(boundaryColor(map(tree).boundaries[0].id),color);assert.equal(map(tree).assets.length,1);
+  select(tree,'Boundary layer','zone');tree=harness.render(read);assert.deepEqual(map(tree).boundaries.map(z=>z.id),['z1']);assert.ok(boundaryTreeNodes(tree).some(n=>String(n.props?.children).includes('partial zone boundary')));
+ }finally{harness.close();React.useMemo=savedMemo;apiModule.api=savedApi;}
+});
+
+test('successful boundary save stays acknowledged when refreshing the directory fails',async()=>{
+ const React=require('react'),savedMemo=React.useMemo,apiModule=require('../src/services/api.ts'),savedApi=apiModule.api;
+ const {BoundaryUpload}=require('../src/pages/cityadmin/BoundaryUpload.tsx');
+ const calls=[],node={id:'ward-a',parentId:'zone-a',name:'Ward 1',level:'WARD',boundary:null};let gets=0;
+ apiModule.api=async(path,options)=>{calls.push(path);if(path.endsWith('/import-preview'))return {features:[{sourceIndex:1,name:'Ward 1',geometry:{type:'Polygon',coordinates:[]}}]};if(path.endsWith('/import'))return {saved:1};if(++gets>1)throw Error('offline');return {nodes:[node,{id:'zone-a',name:'Zone 1',level:'ZONE',boundary:null}]};};
+ matrixStore.currentUser={...profile};React.useMemo=read=>read();const harness=reviewHookHarness(),read=()=>BoundaryUpload({cityId:'city-a',onClose:()=>{}}),flush=()=>new Promise(setImmediate);
+ const find=(tree,match)=>boundaryTreeNodes(tree).find(match),button=(tree,text)=>find(tree,n=>n.type==='button'&&n.props.children===text);
+ try{
+  let tree=harness.render(read);await flush();tree=harness.render(read);
+  find(tree,n=>n.props?.['aria-label']==='Boundary KML file').props.onChange({target:{files:[new File(['<kml/>'],'wards.kml')]}});tree=harness.render(read);button(tree,'Preview boundaries').props.onClick();await flush();tree=harness.render(read);
+  button(tree,'Save selected boundaries').props.onClick();await flush();tree=harness.render(read);
+  assert.equal(calls.filter(p=>p.endsWith('/import')).length,1);assert.equal(button(tree,'Save selected boundaries'),undefined);
+  assert.equal(find(tree,n=>n.props?.role==='status').props.children,'1 boundaries saved.');assert.match(find(tree,n=>n.props?.role==='alert').props.children,/were saved.*could not refresh/);
+ }finally{harness.close();React.useMemo=savedMemo;apiModule.api=savedApi;}
+});
+
 test('SI target reads the ULB saved percentage for the selected area and refreshes without a hardcoded 10%',async()=>{
  const apiModule=require('../src/services/api.ts'),refresh=require('../src/services/useOperationalRefresh.ts');
  const {SiReviewOverview}=require('../src/components/analytics/SiReviewOverview.tsx');
