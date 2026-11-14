@@ -13,7 +13,7 @@ export interface MapTeamPerson {id:string;name:string;role:MapTeamRole;locationK
 export interface MapPersonnel {id:string;cityId:string;name:string;role:MapTeamRole;zoneIds:string[];wardIds:string[];modules:{key:string;zoneIds:string[];wardIds:string[]}[];}
 const MAP_MODULE_KEYS:Record<OperationalModuleId,string>={sweeping:'SWEEPING',toilets:'TOILET',litter_bins:'LITTERBINS',nala:'NALA',ctu_gvp:'TASKFORCE'};
 /** Directory totals use exactly the personnel screen's scope rules, independently of asset links. */
-export function mapPersonnelTeam(directory:MapPersonnel[],assets:MapAsset[],scope:{cityId:string;zone:string;ward:string;modules:string[];wards:{id:string;zoneId:string}[]}):MapTeamPerson[]{
+export function mapPersonnelTeam(directory:MapPersonnel[],assets:MapAsset[],scope:{cityId:string;zone:string;ward:string;modules:string[];wards:{id:string;zoneId:string}[];wardIds?:string[]}):MapTeamPerson[]{
   const linked=new Map(mapAssignedPeople(assets).map(p=>[`${p.role}:${p.id}`,p]));
   const allModules=Object.keys(MAP_MODULE_KEYS).every(key=>scope.modules.includes(key));
   const chosenKeys=new Set(scope.modules.map(key=>MAP_MODULE_KEYS[key]));
@@ -25,6 +25,7 @@ export function mapPersonnelTeam(directory:MapPersonnel[],assets:MapAsset[],scop
     const user={assignedZoneIds:allModules?person.zoneIds:modules.flatMap(m=>m.zoneIds.length?m.zoneIds:person.zoneIds),assignedWardIds:allModules?person.wardIds:modules.flatMap(m=>m.wardIds.length?m.wardIds:person.wardIds),moduleAssignments:modules};
     const geography=personnelScope(user,scope.wards);
     if(scope.zone&&!geography.zoneIds.includes(scope.zone))continue;
+    if(scope.wardIds&&!scope.ward&&!scope.wards.some(w=>scope.wardIds!.includes(w.id)&&personnelAssignedToWard(user,w)))continue;
     const ward=scope.wards.find(w=>w.id===scope.ward);
     if(scope.ward&&(!ward||!personnelAssignedToWard(user,ward)))continue;
     const key=`${person.role}:${person.id}`,assignment=linked.get(key);
@@ -51,8 +52,12 @@ export function mapAssetHasStaff(asset:MapAsset,id:string,role?:MapTeamRole|''):
   return people.some(p=>p.id===id);
 }
 /** Keep both geographic levels visible, including the selected Ward's parent Zone. */
-export function scopedMapBoundaries(data:any,zone:string,ward:string){
+export function scopedMapBoundaries(data:any,zone:string,ward:string,focus?:{zoneIds:string[];wardIds:string[]}|null){
   const allWards=data?.boundaries?.wards||[];
+  if(focus&&!ward)return [
+    ...(data?.boundaries?.zones||[]).filter((b:any)=>focus.zoneIds.includes(b.id)).map((b:any)=>({...b,level:'zone'})),
+    ...allWards.filter((b:any)=>focus.wardIds.includes(b.id)).map((b:any)=>({...b,level:'ward'})),
+  ];
   const parentZone=zone||(ward?(data?.filters?.wards||[]).find((w:any)=>w.id===ward)?.zoneId||allWards.find((w:any)=>w.id===ward)?.zoneId:'');
   return [
     ...(data?.boundaries?.zones||[]).filter((b:any)=>!parentZone||b.id===parentZone).map((b:any)=>({...b,level:'zone'})),

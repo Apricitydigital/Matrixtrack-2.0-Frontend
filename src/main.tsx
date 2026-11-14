@@ -9,6 +9,8 @@ import './styles/inspection-targets.css';
 import './styles/insight-history-map.css';
 
 import './styles/themes.css';
+import './styles/visual-charts.css';
+import './styles/visual-reports.css';
 initializeTheme();
 createRoot(document.getElementById('root')!).render(<App />);
 import './styles/ulb-dashboard.css';
