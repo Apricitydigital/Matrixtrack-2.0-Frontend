@@ -41,6 +41,14 @@ test('summary partitions employees and distinguishes absent matches, review and 
  const c=reconciliationCounts(rows);assert.equal(c.registered,c.matched+c.missing+c.review+c.noData);assert.equal(c.present,0);
  const sheets=reconciliationSheets('Ujjain','2026-11-14',rows,'Ward 44');assert.equal(sheets.find(s=>s.name==='Attendance not found').rows.length,1);assert.equal(sheets.find(s=>s.name==='Needs review').rows.length,1);
 });
+test('municipal roles are visible in the matched register and Excel export',()=>{
+ const municipal={...employees[0],name:'Municipal officer',roles:['SUPERVISOR','QC']};
+ const h=harness({...data,employees:[municipal]});
+ try{const html=renderToStaticMarkup(h.render());assert.match(html,/Registered people/);assert.match(html,/Daroga, SI/);
+  const sheet=reconciliationSheets('Ujjain','2026-11-14',[municipal],'All zones').find(s=>s.name==='Matched attendance');
+  assert.equal(sheet.rows[0][sheet.headers.indexOf('Registered roles')],'Daroga, SI');
+ }finally{h.close();}
+});
 test('missing export includes employees on subsequent pages and respects geography and search',()=>{
  const extra=Array.from({length:15},(_,i)=>({...employees[44],userId:`extra-${i}`,name:`Missing ${i}`,employeeId:`M-${i}`}));
  const h=harness({...data,employees:[...employees,...extra]});let workbook;const saved=spreadsheet.downloadAuditWorkbook;
