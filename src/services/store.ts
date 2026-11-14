@@ -1,3 +1,4 @@
+import { sortNewestFirst } from './sortReports';
 import {canonicalModuleKey} from './moduleKeys';
 import type { City, Zone, Ward, Area, Beat, User, OperationalReport, IecCleanlinessIssue, AttendanceRecord, PlantLog, AuditLogEvent, ActiveSession, Target, Capability, OperationalModuleId, ProductId, RoleType } from '../types';
 import { api, writeApi, clearToken, setToken, getToken, clearReadCache,getSessionVersion,setRefreshToken,revokeCurrentSession,setApiCityContext,setApiCityModules } from './api';
@@ -46,7 +47,7 @@ class MatrixStore {
   public getBeats(cityId?: string, wardId?: string) { return this.data.beats.filter(b => (!cityId || cityId === 'all' || b.cityId === cityId) && (!wardId || wardId === 'all' || b.wardId === wardId)); }
   public getUsers(cityId?: string) { return this.data.users.filter(u => !u.isDeleted && (!cityId || cityId === 'all' || u.cityId === cityId)); }
   public getAllUsersWithTrash() { return this.data.users; }
-  public getReports(cityId?: string) { return this.data.reports.filter(r => !cityId || cityId === 'all' || r.cityId === cityId); }
+  public getReports(cityId?: string) { return sortNewestFirst(this.data.reports.filter(r => !cityId || cityId === 'all' || r.cityId === cityId)); }
   public getReportById(id: string) { return this.data.reports.find(r => r.id === id); }
   public getIecIssues(cityId?: string) { return this.data.iecIssues.filter(i => !cityId || cityId === 'all' || i.cityId === cityId); }
   public getAttendance(cityId?: string) { return this.data.attendance.filter(a => !cityId || cityId === 'all' || a.cityId === cityId); }

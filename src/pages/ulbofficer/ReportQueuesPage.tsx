@@ -1,3 +1,4 @@
+import { sortNewestFirst } from '../../services/sortReports';
 import {IntelligenceSuggestion} from '../../components/reports/IntelligenceSuggestion';
 import { PhotoIntegrityWarning } from '../../components/reports/PhotoIntegrityWarning';
 import React, { useState, useEffect } from 'react';
@@ -44,7 +45,7 @@ export const ReportQueuesPage: React.FC<ReportQueuesPageProps> = ({
   const [search, setSearch] = useState('');
   const [moduleFilter, setModuleFilter] = useState('all');
 
-  const cityReports = reports.filter(r => r.cityId === city.id);
+  const cityReports = sortNewestFirst(reports.filter(r => r.cityId === city.id));
 
   const filteredReports = cityReports.filter(r => {
     if (activeQueue !== 'all' && r.status !== activeQueue) return false;

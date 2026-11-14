@@ -1,3 +1,4 @@
+import { sortNewestFirst } from '../../services/sortReports';
 import {useInspectionCoverage} from '../../services/useInspectionCoverage';
 import {inspectionStatus} from '../../services/inspectionStatus';
 import { actionLifecycle } from '../../services/actionLifecycle';
@@ -11,7 +12,7 @@ import { chartColors, DonutChart } from '../../components/analytics/Analytics';
 export function UlbWorkspace({city,reports,users,zones,wards,currentUser,pageId,onSelectReport,onNavigate,noticeRequest=0,onNoticeHandled,reportIntent}:{reportIntent?:{moduleId:string;status:string};city:City;reports:OperationalReport[];users:User[];zones:Zone[];wards:Ward[];currentUser:User;pageId:string;onSelectReport:(id:string)=>void;onNavigate:(id:string)=>void;noticeRequest?:number;onNoticeHandled?:()=>void}) {
   const range=matrixStore.getDateRange(),coverage=useInspectionCoverage(city,range.from,range.to,matrixStore.loadRevision,true),registerPending=coverage.loading||coverage.data.failedModules.length>0;
   // Queue totals need status/lifecycle fields, not every question and photograph.
-  const rows=useMemo(()=>[...new Map(coverage.data.visits.map(v=>[v.id,v])).values()].map(v=>({...v,status:inspectionStatus(v.status)})),[coverage.data]);
+  const rows=useMemo(()=>sortNewestFirst([...new Map(coverage.data.visits.map(v=>[v.id,v])).values()].map(v=>({...v,status:inspectionStatus(v.status)}))),[coverage.data]);
   const counts={pending_review:rows.filter(r=>r.status==='pending_review').length,approved:rows.filter(r=>r.status==='approved').length,rejected:rows.filter(r=>r.status==='rejected').length,action_required:rows.filter(r=>actionLifecycle(r).required).length,action_taken:rows.filter(r=>actionLifecycle(r).taken).length};
   const queue=({ulb_pending:'pending_review',ulb_approved:'approved',ulb_rejected:'rejected',ulb_action_req:'all_actions_required',ulb_action_taken:'all_actions_taken'} as Record<string,string>)[pageId] || 'all';
   const [briefing,setBriefing]=useState(false);

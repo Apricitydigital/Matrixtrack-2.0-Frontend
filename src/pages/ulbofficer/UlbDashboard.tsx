@@ -1,3 +1,4 @@
+import { sortNewestFirst } from '../../services/sortReports';
 import {ulbReportRegister} from '../../services/ulbReportRegister';
 import {ulbTeamProgress} from '../../services/ulbTeamProgress';
 import {darogaReportProgress} from '../../services/darogaReportProgress';
@@ -93,7 +94,7 @@ export function UlbDashboard({onInspectZone,city,zones,wards,currentUser,onNavig
   useEffect(()=>{if(coverage.loading||autoOpened.current)return;autoOpened.current=true;if(sessionStorage.getItem('matrixtrack_ulb_briefing_seen')!==`${currentUser.id}:${city.id}`)setBriefing(true);},[coverage.loading]);
   const closeBriefing=()=>{sessionStorage.setItem('matrixtrack_ulb_briefing_seen',`${currentUser.id}:${city.id}`);setBriefing(false);};
   const drillData=useMemo(()=>ulbScopeData(cov,drill?.scope||scope),[cov,drill,zoneKey,wardKey,moduleKey]);
-  const allDetailRows=drill?.kind==='not_inspected'?drillData.notInspected.map(a=>({key:a.key,module:a.module,name:a.name,zoneId:a.zoneId,wardId:a.wardId,visit:undefined as typeof data.visits[number]|undefined})):ulbDrillVisits(drillData,drill?.kind||'all').map(v=>({key:v.id,module:v.module,name:cov.assets.find(a=>a.id===v.assetId&&a.module===v.module)?.name||v.assetId||'Location not recorded',zoneId:v.zoneId,wardId:v.wardId,visit:v}));
+  const allDetailRows=drill?.kind==='not_inspected'?drillData.notInspected.map(a=>({key:a.key,module:a.module,name:a.name,zoneId:a.zoneId,wardId:a.wardId,visit:undefined as typeof data.visits[number]|undefined})):sortNewestFirst(ulbDrillVisits(drillData,drill?.kind||'all')).map(v=>({key:v.id,module:v.module,name:cov.assets.find(a=>a.id===v.assetId&&a.module===v.module)?.name||v.assetId||'Location not recorded',zoneId:v.zoneId,wardId:v.wardId,visit:v}));
   const detailRows=allDetailRows.filter(r=>(!drillZones.length||drillZones.includes(r.zoneId||''))&&(!drillWards.length||drillWards.includes(r.wardId||''))&&(!drillModules.length||drillModules.includes(r.module)));
   const details=usePagination(detailRows,JSON.stringify(drill)+range.from+range.to+drillZones.join()+drillWards.join()+drillModules.join());
   useEffect(()=>{setDrillZones([]);setDrillWards([]);setDrillModules([]);},[drill?.kind,JSON.stringify(drill?.scope)]);

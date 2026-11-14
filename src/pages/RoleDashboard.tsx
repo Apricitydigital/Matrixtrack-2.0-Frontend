@@ -1,3 +1,4 @@
+import { sortNewestFirst } from '../services/sortReports';
 import {IntelligenceSummary} from '../components/reports/IntelligenceSuggestion';
 import {IntelligenceSuggestion} from '../components/reports/IntelligenceSuggestion';
 import { PhotoIntegrityWarning } from '../components/reports/PhotoIntegrityWarning';
@@ -19,7 +20,7 @@ export function RoleDashboard({ role, city, cities, users, reports, zones, wards
   const superAdmin = role === 'HMS_SUPER_ADMIN';
   const scope = superAdmin ? matrixStore.selectedCityId : city.id;
   const scopedCities = cities.filter(c => scope === 'all' || c.id === scope);
-  const rows = reports.filter(r => r.cityId === city.id && matchesFilters(r, filters, [r.reportNumber, r.assetName, r.submittedByName, r.assignedDarogaName || '']));
+  const rows = sortNewestFirst(reports.filter(r => r.cityId === city.id && matchesFilters(r, filters, [r.reportNumber, r.assetName, r.submittedByName, r.assignedDarogaName || ''])));
   const counts = { red: rows.filter(r => statusTone(r.status) === 'red').length, yellow: rows.filter(r => statusTone(r.status) === 'yellow').length, green: rows.filter(r => statusTone(r.status) === 'green').length };
   const names = { CITY_ADMIN: ['CITY OPERATIONS', 'A clearer view of your city.', 'Geography, teams and inspections in one working view.'], ULB_OFFICER: ['OPERATIONS & REVIEW', 'Review. Prioritise. Resolve.', 'Focus on inspections and IEC issues that need your attention.'], COMMISSIONER: ['EXECUTIVE OVERSIGHT', 'Your city, at a glance.', 'Track municipal operations and direct attention where it matters.'], HMS_SUPER_ADMIN: ['PLATFORM GOVERNANCE', 'Every city. One clear view.', 'Manage city access, administrators and platform governance.'] }[role];
   const openRequests = users.filter(u => u.status === 'pending_approval').length;
