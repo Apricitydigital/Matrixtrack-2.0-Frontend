@@ -3,13 +3,13 @@ require.extensions['.ts']=(module,filename)=>module._compile(ts.transpileModule(
 const {rankingEvidence,rankingFormula}=require('../src/services/wardRankingEvidence.ts');
 test('workforce evidence distinguishes employee-days, missing records and absence without deployment claims',()=>{
  const e=rankingEvidence('workforce',{manpowerScheduled:90,present:70,matchedAttendance:75,uniqueScheduledEmployees:45,confirmedAbsent:5,attendanceNotFound:15,attendanceNeedsReview:0,correctlyDeployed:70,unmannedBeats:3});
- assert.equal(e.primary.find(x=>x.id==='manpowerScheduled').label,'Scheduled');
+ assert.equal(e.primary.find(x=>x.id==='manpowerScheduled').label,'Registered attendance required');
  assert.equal(e.primary.length,4);
  assert.ok(!e.primary.some(x=>x.id==='uniqueScheduledEmployees'));
  assert.ok(e.additional.some(([key,value])=>key==='uniqueScheduledEmployees'&&value===45));
  assert.ok(e.primary.find(x=>x.id==='attendanceNotFound').help.includes('Names are not used'));
  assert.ok(![...e.primary,...e.additional].some(x=>x.id==='correctlyDeployed'||x[0]==='correctlyDeployed'));
- assert.equal(rankingFormula('workforce','deployment',{present:35,manpowerScheduled:45}),'Matched present / scheduled employee-days: 35 / 45');
+ assert.equal(rankingFormula('workforce','deployment',{present:35,manpowerScheduled:45}),'Matched present / registered attendance required: 35 / 45');
 });
 test('module formulas preserve work denominators and target overrides',()=>{
  assert.equal(rankingFormula('beat','inspectionCoverage',{beatsChecked:5,beatsDue:32}),'Completed / required: 5 / 32');
