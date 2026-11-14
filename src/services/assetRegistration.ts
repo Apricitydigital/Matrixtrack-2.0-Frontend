@@ -14,8 +14,12 @@ export function validateAssetCsv(cityId:string,module:CsvAssetModule,text:string
     if(row.length!==headers.length)fail('Incorrect number of columns.');
     // Existing bin/GVP parsers use simple comma splitting; reject unsupported quoted fields before any write.
     if(module!=='toilets'&&row.some(v=>/[",\r\n]/.test(v)))fail('Commas, quotes and line breaks are not supported in these fields.');
-    const zone=zones.find(z=>z.cityId===cityId&&(z.name.toLowerCase()===row[0].toLowerCase()||`Zone ${z.zoneNumber}`.toLowerCase()===row[0].toLowerCase()));
-    const ward=wards.find(w=>w.cityId===cityId&&w.zoneId===zone?.id&&(w.name.toLowerCase()===row[1].toLowerCase()||`Ward ${w.wardNumber}`.toLowerCase()===row[1].toLowerCase()));
+    // Tolerate "Zone - 1", "Zone-1", "zone 1" etc.; strip stray spaces inside coordinates ("23. 206187").
+    row.forEach((v,i)=>{row[i]=v.trim();});
+    for(const i of [row.length-2,row.length-1])row[i]=row[i].replace(/\s+/g,'');
+    const norm=(s:string)=>s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu,'');
+    const zone=zones.find(z=>z.cityId===cityId&&(norm(z.name)===norm(row[0])||norm(`Zone ${z.zoneNumber}`)===norm(row[0])));
+    const ward=wards.find(w=>w.cityId===cityId&&w.zoneId===zone?.id&&(norm(w.name)===norm(row[1])||norm(`Ward ${w.wardNumber}`)===norm(row[1])));
     if(!zone||!ward)fail('Zone and Ward must match the city hierarchy.');
     // Submit canonical backend node names rather than displayName-decorated labels.
     if(zone)row[0]=zone.backendName||zone.name;if(ward)row[1]=ward.backendName||ward.name;

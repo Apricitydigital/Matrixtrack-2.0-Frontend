@@ -75,6 +75,7 @@ const TrashRestorePage=lazy(()=>import('./pages/superadmin/TrashRestorePage').th
 const CityDashboard=lazy(()=>import('./pages/cityadmin/CityDashboard').then(m=>({default:m.CityDashboard})));
 const ZonesWards=lazy(()=>import('./pages/cityadmin/ZonesWards').then(m=>({default:m.ZonesWards})));
 const AreasBeats=lazy(()=>import('./pages/cityadmin/AreasBeats').then(m=>({default:m.AreasBeats})));
+const ModuleAssignments=lazy(()=>import('./pages/cityadmin/ModuleAssignments').then(m=>({default:m.ModuleAssignments})));
 const CommissionerAttendance=lazy(()=>import('./pages/commissioner/CommissionerAttendance').then(m=>({default:m.CommissionerAttendance})));
 const WardRankingPage=lazy(()=>import('./pages/cityadmin/WardRankingPage').then(m=>({default:m.WardRankingPage})));
 const ChatHistory=lazy(()=>import('./pages/commissioner/ChatHistory').then(m=>({default:m.ChatHistory})));
@@ -358,7 +359,7 @@ export function Dashboard({ initialPage }: { initialPage?: string } = {}) {
 
         {/* Content Viewport */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
-          {['COMMISSIONER','ULB_OFFICER','CITY_ADMIN'].includes(currentRole) && <CommissionerToolbar pageId={activePageId} title={getPageTitle()} cityName={effectiveCity.name}/>}
+          {['COMMISSIONER','ULB_OFFICER','CITY_ADMIN'].includes(currentRole) && !(activePageId==='comm_dashboard'&&currentRole==='COMMISSIONER') && <CommissionerToolbar pageId={activePageId} title={getPageTitle()} cityName={effectiveCity.name}/>}
           {!needsCitySelection&&!['COMMISSIONER','ULB_OFFICER','CITY_ADMIN'].includes(currentRole)&&!['sa_dashboard','sa_users','sa_city_admins','sa_audit_logs','ca_dashboard'].includes(activePageId)&&activePageId!=='ca_attendance' && <DataLoadingBar pageId={activePageId} />}
           <div className="commissioner-page-content"><Suspense fallback={<PageLoadingSkeleton/>}>
           {needsCitySelection ? <section className="workspace-panel p-8"><h1>Choose a city</h1><p>Select an authorized city above to view its operational progress.</p><button className="workspace-secondary-button mt-4" onClick={()=>navigate('sa_cities_dir')}>Open city directory</button></section> : !canAccessPage(currentUser.role as RoleType, activePageId, effectiveCity) ? <section className="workspace-panel p-8"><h1 className="text-lg font-semibold">This page is not available to your account</h1><p className="text-sm text-slate-500 mt-2">Choose an enabled page from your navigation.</p></section> : pageLoading ? <PageLoadingSkeleton /> : <>
@@ -449,8 +450,25 @@ export function Dashboard({ initialPage }: { initialPage?: string } = {}) {
             />
           )}
 
-          {(activePageId === 'ca_beats' || activePageId === 'ca_assignments') && (
+          {(activePageId === 'ca_beats') && (
             <AreasBeats
+              city={effectiveCity}
+              beats={beats}
+              zones={zones}
+              wards={wards}
+              users={users}
+              currentUser={currentUser}
+              onOpenImport={() => setCsvImportModal({
+                isOpen: true,
+                type: 'beats',
+                title: `Bulk Import Sweeping Beats - ${effectiveCity.name}`
+              })}
+              onRefresh={() => setStoreRevision(r => r + 1)}
+            />
+          )}
+
+          {activePageId === 'ca_assignments' && (
+            <ModuleAssignments
               city={effectiveCity}
               beats={beats}
               zones={zones}
