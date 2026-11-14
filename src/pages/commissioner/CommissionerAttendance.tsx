@@ -11,9 +11,14 @@ import { downloadCsv, generateCsv } from '../../services/csv';
 import { printElement } from '../../services/print';
 import { AttendanceInsights } from './AttendanceInsights';
 import { useFilterDismiss } from '../../components/common/FilterPopover';
+import { RegisteredAttendance } from './RegisteredAttendance';
 const initial={zoneId:'',wardId:'',status:'',search:'',designation:'',officeLocation:'',divisionUnit:'',checkoutState:'',workDurationBucket:''};
 const number=(n:any)=>n==null?'—':Number(n).toLocaleString('en-IN',{maximumFractionDigits:1});
 export function CommissionerAttendance({city,zones,wards,onUpload}:{city:City;zones:Zone[];wards:Ward[];onUpload?:()=>void}) {
+  const [tab,setTab]=useState('overview');
+  return <div className="space-y-5"><nav className="attendance-section-tabs" aria-label="Attendance pages"><button aria-current={tab==='overview'?'page':undefined} onClick={()=>setTab('overview')}>Attendance overview</button><button aria-current={tab==='registered'?'page':undefined} onClick={()=>setTab('registered')}>Matched with registered employees</button></nav>{tab==='overview'?<AttendanceOverview key={city.id} city={city} zones={zones} wards={wards} onUpload={onUpload}/>:<RegisteredAttendance key={city.id} city={city} zones={zones} wards={wards}/>}</div>;
+}
+function AttendanceOverview({city,zones,wards,onUpload}:{city:City;zones:Zone[];wards:Ward[];onUpload?:()=>void}) {
   const area=useRef<HTMLElement>(null);
   const [filters,setFilters]=useState(initial),[query,setQuery]=useState(''),[advanced,setAdvanced]=useState(false);
   const filterPanel=useRef<HTMLElement>(null),filterTrigger=useRef<HTMLButtonElement>(null);
