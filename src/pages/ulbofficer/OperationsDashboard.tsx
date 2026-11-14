@@ -87,7 +87,7 @@ export const OperationsDashboard: React.FC<OperationsDashboardProps> = ({
             onClick={() => onNavigate('ulb_action_req')}
             className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-xs transition-colors"
           >
-            <span>Action Required Queue ({actionRequired.length})</span>
+            <span>ULB Action Required Queue ({actionRequired.length})</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -117,7 +117,7 @@ export const OperationsDashboard: React.FC<OperationsDashboardProps> = ({
           onClick={() => onNavigate('ulb_action_req')}
           className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs hover:border-indigo-400 cursor-pointer transition-all"
         >
-          <span className="text-xs text-indigo-700 font-semibold uppercase tracking-wider block mb-1">Action Required</span>
+          <span className="text-xs text-indigo-700 font-semibold uppercase tracking-wider block mb-1">ULB Action Required</span>
           <div className="text-2xl font-bold font-mono text-slate-900 tabular-nums">{actionRequired.length}</div>
           <span className="text-[15px] text-slate-400 mt-1 block">Escalated for fix</span>
         </div>
@@ -126,7 +126,7 @@ export const OperationsDashboard: React.FC<OperationsDashboardProps> = ({
           onClick={() => onNavigate('ulb_action_taken')}
           className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs hover:border-blue-400 cursor-pointer transition-all"
         >
-          <span className="text-xs text-blue-700 font-semibold uppercase tracking-wider block mb-1">Action Taken</span>
+          <span className="text-xs text-blue-700 font-semibold uppercase tracking-wider block mb-1">IEC Action Taken</span>
           <div className="text-2xl font-bold font-mono text-slate-900 tabular-nums">{actionTaken.length}</div>
           <span className="text-[15px] text-slate-400 mt-1 block">Field fix submitted</span>
         </div>

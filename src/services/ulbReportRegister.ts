@@ -1,3 +1,4 @@
+import { sortNewestFirst } from './sortReports';
 import { actionLifecycle } from './actionLifecycle';
 import { inspectionStatus, type InspectionCoverage, type InspectionVisit } from './inspectionCoverage';
 
@@ -50,6 +51,6 @@ export function ulbReportRegister(data: InspectionCoverage): InspectionCoverage 
     if (new Set(group.map(v => `${v.zoneId}:${v.wardId}`)).size > 1) uncertain.add('sweeping');
     visits.push(mergeBeatReport(group));
   }
-  return {...data, visits, failedModules: [...uncertain], errors: uncertain.size > data.failedModules.length
+  return {...data, visits: sortNewestFirst(visits), failedModules: [...uncertain], errors: uncertain.size > data.failedModules.length
     ? [...data.errors, 'Some Sweeping reports lack consistent beat, date or area identifiers; report totals are unavailable.'] : data.errors};
 }

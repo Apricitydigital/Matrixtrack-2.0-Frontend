@@ -700,7 +700,7 @@ test('RYG follows workflow meaning and does not invent severity for missing data
   for (const value of ['pending_review', 'PENDING_QC', 'action_taken', 'pending_approval']) assert.equal(statusTone(value), 'yellow');
   for (const value of ['approved', 'approved_closed', 'present', 'GREEN']) assert.equal(statusTone(value), 'green');
   for (const value of ['unknown', 'not_assessed', 'unmarked', 'leave', 'inactive']) assert.equal(statusTone(value), 'neutral');
-  assert.equal(statusLabel('action_taken'), 'Action taken');
+  assert.equal(statusLabel('action_taken'), 'IEC Action taken');
   assert.equal(issueIsOverdue({ status: 'pending_review', deadlineTimestamp: '2026-01-01T00:00:00Z' }, Date.parse('2026-01-02')), true);
   assert.equal(issueIsOverdue({ status: 'approved_closed', deadlineTimestamp: '2026-01-01T00:00:00Z' }, Date.parse('2026-01-02')), false);
 });
@@ -1020,9 +1020,10 @@ test('ULB AI preserves recommendation reasons and bilingual action without chang
   matrixStore.currentUser.role = 'COMMISSIONER'; await assert.rejects(matrixStore.generateOperationalAi(r.id), /ULB Officer access/);
 });
 
-test('ULB corrective action requires completed SI decision and remarks; rejected writes retain report state', async () => {
+test('ULB corrective action accepts pending reports, requires remarks and preserves state on rejected writes', async () => {
   const r = await ulbReportSession(); const before = r.status; r.status = 'pending_review'; const count = requests.length;
-  await assert.rejects(matrixStore.escalateOperationalReport(r.id, 'Cleanup needed', '', matrixStore.currentUser), /after a SI/); assert.equal(requests.length, count);
+  failures.set('/modules/SWEEPING/records/record-a/status', 403);
+  await assert.rejects(matrixStore.escalateOperationalReport(r.id, 'Cleanup needed', '', matrixStore.currentUser), /refused/); assert.ok(requests.length > count); assert.equal(r.status, 'pending_review');
   r.status = before; await assert.rejects(matrixStore.escalateOperationalReport(r.id, '  ', '', matrixStore.currentUser), /reason/);
   failures.set('/modules/SWEEPING/records/record-a/status', 403); await assert.rejects(matrixStore.escalateOperationalReport(r.id, 'Cleanup needed', '', matrixStore.currentUser), /refused/); assert.equal(r.status, before);
   const request = requests.at(-1); assert.equal(request.options.method, 'PATCH'); assert.deepEqual(JSON.parse(request.options.body), { status: 'ACTION_REQUIRED', remarks: 'Cleanup needed' });
@@ -1088,7 +1089,10 @@ test('ULB opens exact pending litter-bin records from the authorized register wi
   const visit = inspectionVisit(raw, 'litter_bins', 'city-a'), before = requests.length;
   const id = await matrixStore.loadOperationalReport('litter_bins', raw.id, { name: 'Litter Bin A', wardId: 'ward-a' }, visit.raw);
   assert.equal(requests.length, before); const report = matrixStore.getReportById(id); assert.equal(report.backendId, 'older-bin-report'); assert.equal(report.status, 'pending_review'); assert.equal(report.questions.length, 1); assert.equal(report.backendType, 'VISIT_REPORT');
-  await assert.rejects(matrixStore.escalateOperationalReport(id, 'Cleanup needed', '', matrixStore.currentUser), /after a SI/); assert.equal(requests.length, before);
+  failures.set('/modules/twinbin/visits/older-bin-report/action-required', 403);
+  await assert.rejects(matrixStore.escalateOperationalReport(id, 'Cleanup needed', '', matrixStore.currentUser), /refused/);
+  assert.equal(report.status, 'pending_review'); assert.equal(requests.at(-1).options.method, 'POST');
+  assert.deepEqual(JSON.parse(requests.at(-1).options.body), { qcRemark: 'Cleanup needed' });
   await assert.rejects(matrixStore.loadOperationalReport('litter_bins', raw.id, {}, { ...raw, cityId: 'city-b' }), /outside your city/);
   await assert.rejects(matrixStore.loadOperationalReport('litter_bins', raw.id, {}, { ...raw, id: 'different' }), /identifier does not match/);
 });
@@ -1116,6 +1120,11 @@ test('ULB navigation includes pending review, analytics and plant uploads withou
   const { getNavGroups, canAccessPage } = require('../src/components/layout/Sidebar.tsx'); const { pageDatasets } = require('../src/services/workspace.ts');
   const groups = getNavGroups('ULB_OFFICER'); assert.equal(groups.some(g => g.groupTitle === 'CONNECTED PRODUCTS'), false);
   for (const page of ['ulb_pending', 'ulb_user_perf', 'prod_plant', 'ulb_attendance']) assert.equal(canAccessPage('ULB_OFFICER', page), true);
+  for (const page of ['ulb_pending', 'ulb_approved', 'ulb_rejected', 'ulb_action_req', 'ulb_action_taken']) {
+    assert.equal(canAccessPage('ULB_OFFICER', page), true);
+    assert.equal(groups.some(g => g.items.some(item => item.id === page)), false);
+    assert.equal(canAccessPage('EMPLOYEE', page), false);
+  }
   assert.deepEqual(pageDatasets('ulb_pending'), ['geography']); assert.deepEqual(pageDatasets('ulb_attendance'), ['geography']);
 });
 

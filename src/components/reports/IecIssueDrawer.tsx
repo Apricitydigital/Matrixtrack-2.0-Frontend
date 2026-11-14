@@ -214,7 +214,7 @@ export const IecIssueDrawer: React.FC<IecIssueDrawerProps> = ({
                     ULB Officer Grievance Determination
                   </h4>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Action Required sends the SAME issue back to Daroga for corrective inspection under 24-hr SLA.
+                    ULB Action Required sends the SAME issue back to Daroga for corrective inspection under 24-hr SLA.
                   </p>
                 </div>
               </div>
@@ -234,7 +234,7 @@ export const IecIssueDrawer: React.FC<IecIssueDrawerProps> = ({
                     className="flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs"
                   >
                     <RotateCcw className="w-4 h-4" />
-                    <span>Action Required (Return to Daroga)</span>
+                    <span>ULB Action Required (Return to Daroga)</span>
                   </button>
 
                   <button

@@ -11,7 +11,7 @@ export function matchesUlbScope(row:{zoneId:string;wardId:string;module?:Operati
 export function ulbSelectedWards(selected:string[],zoneIds:string[],wards:{id:string;zoneId:string}[]) {
   return selected.filter(id=>wards.some(ward=>ward.id===id&&(!zoneIds.length||zoneIds.includes(ward.zoneId))));
 }
-export const ulbDrillLabels:Record<UlbDrill,string>={all:'Inspection reports',inspections_completed:'Reports received · submitted inspections',unclassified:'Pending review',escalated:'Escalated reports',approved:'Approved reports',rejected:'Rejected reports',pending_review:'Pending SI review',action_required:'Action required',action_pending:'Action required (pending)',action_taken:'Action taken',repeats:'Repeat inspections',not_inspected:'Locations not inspected'};
+export const ulbDrillLabels:Record<UlbDrill,string>={all:'Inspection reports',inspections_completed:'Reports received · submitted inspections',unclassified:'Pending review',escalated:'Escalated reports',approved:'Approved reports',rejected:'Rejected reports',pending_review:'Pending SI review',action_required:'ULB Action required',action_pending:'ULB Action required (pending)',action_taken:'IEC Action taken',repeats:'Repeat inspections',not_inspected:'Locations not inspected'};
 export function ulbActionWasRequired(visit:InspectionVisit){return actionLifecycle(visit).required;}
 export function inspectionDateTime(value?:string){const time=value?Date.parse(value):NaN;return Number.isFinite(time)?new Date(time).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'Not recorded';}
 export function ulbVisitStatus(visit:InspectionVisit){return inspectionStatus(visit.status);}

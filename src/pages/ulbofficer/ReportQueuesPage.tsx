@@ -1,3 +1,4 @@
+import { sortNewestFirst } from '../../services/sortReports';
 import {IntelligenceSuggestion} from '../../components/reports/IntelligenceSuggestion';
 import { PhotoIntegrityWarning } from '../../components/reports/PhotoIntegrityWarning';
 import React, { useState, useEffect } from 'react';
@@ -44,7 +45,7 @@ export const ReportQueuesPage: React.FC<ReportQueuesPageProps> = ({
   const [search, setSearch] = useState('');
   const [moduleFilter, setModuleFilter] = useState('all');
 
-  const cityReports = reports.filter(r => r.cityId === city.id);
+  const cityReports = sortNewestFirst(reports.filter(r => r.cityId === city.id));
 
   const filteredReports = cityReports.filter(r => {
     if (activeQueue !== 'all' && r.status !== activeQueue) return false;
@@ -119,8 +120,8 @@ export const ReportQueuesPage: React.FC<ReportQueuesPageProps> = ({
           { id: 'pending_review', label: `Pending review (${cityReports.filter(r => r.status === 'pending_review').length})`, icon: Clock },
           { id: 'approved', label: `Approved Reports (${queueCounts.approved})`, icon: CheckCircle2 },
           { id: 'rejected', label: `Rejected Reports (${queueCounts.rejected})`, icon: XCircle },
-          { id: 'action_required', label: `Action Required (${queueCounts.action_required})`, icon: AlertTriangle },
-          { id: 'action_taken', label: `Action Taken (${queueCounts.action_taken})`, icon: RotateCcw }
+          { id: 'action_required', label: `ULB Action Required (${queueCounts.action_required})`, icon: AlertTriangle },
+          { id: 'action_taken', label: `IEC Action Taken (${queueCounts.action_taken})`, icon: RotateCcw }
         ].map(tab => {
           const Icon = tab.icon;
           const isActive = activeQueue === tab.id;

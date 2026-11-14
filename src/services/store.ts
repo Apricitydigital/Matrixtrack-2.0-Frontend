@@ -1,3 +1,4 @@
+import { sortNewestFirst } from './sortReports';
 import {canonicalModuleKey} from './moduleKeys';
 import type { City, Zone, Ward, Area, Beat, User, OperationalReport, IecCleanlinessIssue, AttendanceRecord, PlantLog, AuditLogEvent, ActiveSession, Target, Capability, OperationalModuleId, ProductId, RoleType } from '../types';
 import { api, writeApi, clearToken, setToken, getToken, clearReadCache,getSessionVersion,setRefreshToken,revokeCurrentSession,setApiCityContext,setApiCityModules } from './api';
@@ -46,7 +47,7 @@ class MatrixStore {
   public getBeats(cityId?: string, wardId?: string) { return this.data.beats.filter(b => (!cityId || cityId === 'all' || b.cityId === cityId) && (!wardId || wardId === 'all' || b.wardId === wardId)); }
   public getUsers(cityId?: string) { return this.data.users.filter(u => !u.isDeleted && (!cityId || cityId === 'all' || u.cityId === cityId)); }
   public getAllUsersWithTrash() { return this.data.users; }
-  public getReports(cityId?: string) { return this.data.reports.filter(r => !cityId || cityId === 'all' || r.cityId === cityId); }
+  public getReports(cityId?: string) { return sortNewestFirst(this.data.reports.filter(r => !cityId || cityId === 'all' || r.cityId === cityId)); }
   public getReportById(id: string) { return this.data.reports.find(r => r.id === id); }
   public getIecIssues(cityId?: string) { return this.data.iecIssues.filter(i => !cityId || cityId === 'all' || i.cityId === cityId); }
   public getAttendance(cityId?: string) { return this.data.attendance.filter(a => !cityId || cityId === 'all' || a.cityId === cityId); }
@@ -261,7 +262,7 @@ class MatrixStore {
     const report = this.getReportById(id);
     if (!report) throw new Error('Report not found.');
     if(!this.currentUser || !this.hasCapability(this.currentUser,'escalateOperationalReport',report.cityId))throw new Error('This account cannot request corrective action.');
-    if(!['approved','rejected'].includes(report.status))throw new Error('Action Required is available after a SI decision.');
+    if(!['pending_review','approved','rejected'].includes(report.status))throw new Error('ULB Action Required is available only on Pending, Approved or Rejected reports.');
     if(!reason.trim())throw new Error('Enter the reason for corrective action.');
     if(report.moduleId==='toilets')return this.mutate(`/modules/toilet/inspections/${report.backendId}/review`,'POST',{status:'ACTION_REQUIRED',comment:reason});
     if(report.moduleId==='ctu_gvp')return this.mutate(`/modules/taskforce/reports/${report.backendId}/action-required`,'POST',{remarks:reason,ulbRemark:reason});

@@ -55,8 +55,10 @@ interface SidebarProps {
 
 export function canAccessPage(role: RoleType, pageId: string, city?: City): boolean {
   const listed = getNavGroups(role).some(group => group.items.some(item => item.id === pageId));
+    // Queue tabs share Inspection Performance; they remain valid internal ULB views without sidebar entries.
+    const ulbQueueView = role === 'ULB_OFFICER' && ['ulb_pending', 'ulb_approved', 'ulb_rejected', 'ulb_action_req', 'ulb_action_taken'].includes(pageId);
   const superCityView = role === 'HMS_SUPER_ADMIN' && pageId.startsWith('ca_') && getNavGroups('CITY_ADMIN').some(group => group.items.some(item => item.id === pageId));
-  if (!listed && !superCityView) return false;
+    if (!listed && !superCityView && !ulbQueueView) return false;
   if (city && pageId.startsWith('mod_') && !city.enabledModules.includes(pageId.slice(4) as any)) return false;
   const product = ({ prod_swachh: 'swachh_assessment', prod_workforce: 'workforce_monitoring', prod_plant: 'plant_processing', comm_plant: 'plant_processing' } as const)[pageId];
   if (city && product && role !== 'HMS_SUPER_ADMIN' && !city.enabledProducts.includes(product)) return false;
@@ -117,7 +119,7 @@ export function getNavGroups(currentRole: RoleType, pendingRequestCount = 0, ope
               { id: 'ca_dashboard', label: 'City Administration', icon: LayoutDashboard },
               { id: 'ca_map', label: 'City Operations Map', icon: Map },
               { id: 'ca_daily_reports', label: 'Inspection Reports', icon: FileText },
-              { id: 'ca_attention', label: 'Action Required', icon: AlertCircle }
+              { id: 'ca_attention', label: 'ULB Action Required', icon: AlertCircle }
             ]
           },
           {
@@ -179,17 +181,6 @@ export function getNavGroups(currentRole: RoleType, pendingRequestCount = 0, ope
             items: [
               { id: 'ulb_dashboard', label: 'Operations Dashboard', icon: LayoutDashboard },
               { id: 'ulb_map', label: 'City Operations Map', icon: Map }
-            ]
-          },
-          {
-            groupTitle: 'OPERATIONAL REPORT QUEUES',
-            items: [
-              {id:'ulb_reports',label:'Inspection Reports',icon:FileText},
-              {id:'ulb_pending',label:'Pending SI Review',icon:Clock},
-              { id: 'ulb_approved', label: 'Approved Reports', icon: CheckCircle2 },
-              { id: 'ulb_rejected', label: 'Rejected Reports', icon: XCircle },
-              { id: 'ulb_action_req', label: 'Action Required Queue', icon: AlertCircle, badge: 'Intervene' },
-              { id: 'ulb_action_taken', label: 'Action Taken Queue', icon: CheckCircle2 }
             ]
           },
           {
@@ -298,7 +289,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
               {group.items.map(item => {
                 const Icon = item.icon;
-                const isActive = activePageId === item.id;
+                const isActive = activePageId === item.id || (item.id === 'ulb_inspection_perf' && ['ulb_reports','ulb_pending','ulb_approved','ulb_rejected','ulb_action_req','ulb_action_taken'].includes(activePageId));
                 return (
                   <button
                     key={item.id}
