@@ -204,7 +204,8 @@ export function AreaDistribution({items, onSelect}:{items:VizItem[];onSelect?:(i
 
 /* ---------- Area series (replaces multi-line chart) ---------- */
 export function AreaSeries({points, series, onSelect}:{points:{id:string;label:string;values:(number | null | undefined)[]}[];series:{label:string;color:string}[];onSelect?:(id:string) => void}) {
-  const gid = useId().replace(/:/g, ''), [active, setActive] = useState<number | null>(null);
+  const gid = useId().replace(/:/g, ''), [activeId, setActive] = useState<string | null>(null);
+  const active = points.findIndex(p => p.id === activeId), activePoint = points[active];
   const all = points.flatMap(p => p.values.filter(finite)) as number[];
   if (!points.length || !all.length) return <div className="analytics-empty">No trend data for this selection.</div>;
   const peak = Math.max(1, ...all), W = 680, H = 236, L = 42, R = 20, T = 16, B = 40;
@@ -223,7 +224,7 @@ export function AreaSeries({points, series, onSelect}:{points:{id:string;label:s
         </g>; })}</g>;
       })}
       {points.map((p, i) => <g key={p.id} tabIndex={0} role={onSelect ? 'button' : 'img'} aria-label={`${p.label}, ${series.map((s, j) => `${s.label} ${amount(p.values[j])}`).join(', ')}`}
-        onMouseEnter={() => setActive(i)} onMouseLeave={() => setActive(null)} onFocus={() => setActive(i)} onBlur={() => setActive(null)} onClick={() => onSelect?.(p.id)} onKeyDown={keyActivate(onSelect && (() => onSelect(p.id)))} style={{cursor: onSelect ? 'pointer' : 'default'}}>
+        onMouseEnter={() => setActive(p.id)} onMouseLeave={() => setActive(null)} onFocus={() => setActive(p.id)} onBlur={() => setActive(null)} onClick={() => onSelect?.(p.id)} onKeyDown={keyActivate(onSelect && (() => onSelect(p.id)))} style={{cursor: onSelect ? 'pointer' : 'default'}}>
         <rect x={x(i) - (W - L - R) / Math.max(1, points.length) / 2} y={T} width={(W - L - R) / Math.max(1, points.length)} height={H - T - B} fill="transparent"/>
         {active === i && <><line x1={x(i)} x2={x(i)} y1={T} y2={y(0)} className="viz-crosshair"/>{series.map((s, j) => finite(p.values[j]) ? <circle key={j} cx={x(i)} cy={y(p.values[j] as number)} r="5" fill={colors[j]} stroke="var(--viz-surface)" strokeWidth="2"/> : null)}</>}
       </g>)}
@@ -231,8 +232,8 @@ export function AreaSeries({points, series, onSelect}:{points:{id:string;label:s
       {points.length > 2 && <text x={x(Math.floor((points.length - 1) / 2))} y={H - 14} textAnchor="middle" className="viz-axis">{points[Math.floor((points.length - 1) / 2)].label}</text>}
       {points.length > 1 && <text x={W - R} y={H - 14} textAnchor="end" className="viz-axis">{points.at(-1)!.label}</text>}
     </svg>
-    <div className="series-readout viz-readout" aria-live="polite">{active != null
-      ? <><strong>{points[active].label}</strong>{series.map((s, j) => <span key={s.label}><i style={{background: colors[j]}}/>{s.label}<b>{amount(points[active].values[j])}</b></span>)}</>
+    <div className="series-readout viz-readout" aria-live="polite">{activePoint
+      ? <><strong>{activePoint.label}</strong>{series.map((s, j) => <span key={s.label}><i style={{background: colors[j]}}/>{s.label}<b>{amount(activePoint.values[j])}</b></span>)}</>
       : series.map((s, j) => <span key={s.label}><i style={{background: colors[j]}}/>{s.label}</span>)}</div>
   </div>;
 }

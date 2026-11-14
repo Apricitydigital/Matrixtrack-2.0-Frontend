@@ -16,12 +16,19 @@ export function dailyInspectionTrend(data:InspectionCoverage) {
   }
   const from = data.from || [...counts.keys()].sort()[0], to = data.to || [...counts.keys()].sort().at(-1);
   if (!from || !to) return [];
-  const days:string[] = [];
-  for (let t = Date.parse(`${from}T00:00:00Z`), end = Date.parse(`${to}T00:00:00Z`); t <= end && days.length < 400; t += 86400_000) days.push(new Date(t).toISOString().slice(0, 10));
-  if (days.length <= 62) return days.map(d => ({id: d, label: short(d), value: counts.get(d) || 0}));
-  const weeks:{id:string;label:string;value:number}[] = [];
-  days.forEach((d, i) => { if (i % 7 === 0) weeks.push({id: d, label: `Week of ${short(d)}`, value: 0}); weeks.at(-1)!.value += counts.get(d) || 0; });
-  return weeks;
+  const start = Date.parse(`${from}T00:00:00Z`), end = Date.parse(`${to}T00:00:00Z`), day = 86400_000;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end) return [];
+  const step = (end - start) / day + 1 <= 62 ? day : 7 * day;
+  const buckets:{id:string;label:string;value:number}[] = [];
+  for (let t = start; t <= end; t += step) {
+    const id = new Date(t).toISOString().slice(0, 10);
+    buckets.push({id, label: `${step === day ? '' : 'Week of '}${short(id)}`, value: 0});
+  }
+  for (const [date, count] of counts) {
+    const t = Date.parse(`${date}T00:00:00Z`);
+    if (t >= start && t <= end) buckets[Math.floor((t - start) / step)].value += count;
+  }
+  return buckets;
 }
 
 /** Same geography rules as commissionerReportData: selected zones/wards first, then a single zone/ward. */
