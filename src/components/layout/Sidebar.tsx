@@ -182,17 +182,6 @@ export function getNavGroups(currentRole: RoleType, pendingRequestCount = 0, ope
             ]
           },
           {
-            groupTitle: 'OPERATIONAL REPORT QUEUES',
-            items: [
-              {id:'ulb_reports',label:'Inspection Reports',icon:FileText},
-              {id:'ulb_pending',label:'Pending SI Review',icon:Clock},
-              { id: 'ulb_approved', label: 'Approved Reports', icon: CheckCircle2 },
-              { id: 'ulb_rejected', label: 'Rejected Reports', icon: XCircle },
-              { id: 'ulb_action_req', label: 'Action Required Queue', icon: AlertCircle, badge: 'Intervene' },
-              { id: 'ulb_action_taken', label: 'Action Taken Queue', icon: CheckCircle2 }
-            ]
-          },
-          {
             groupTitle: 'IEC CLEANLINESS WORKFLOW',
             items: [
               { id: 'ulb_iec_issues', label: 'IEC Cleanliness Issues', icon: ShieldCheck, badge: openIssuesCount }
@@ -298,7 +287,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
               {group.items.map(item => {
                 const Icon = item.icon;
-                const isActive = activePageId === item.id;
+                const isActive = activePageId === item.id || (item.id === 'ulb_inspection_perf' && ['ulb_reports','ulb_pending','ulb_approved','ulb_rejected','ulb_action_req','ulb_action_taken'].includes(activePageId));
                 return (
                   <button
                     key={item.id}

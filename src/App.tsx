@@ -311,7 +311,7 @@ export function Dashboard({ initialPage }: { initialPage?: string } = {}) {
 
   const overviewRole: RoleType = activePageId === 'ca_dashboard' ? 'CITY_ADMIN' : currentRole;
   const navigate = (pageId: string) => {
-    if(currentRole==='ULB_OFFICER'){pageId=({comm_dashboard:'ulb_dashboard',comm_map:'ulb_map',comm_zone_ward:'ulb_dashboard',comm_attendance:'ulb_attendance',comm_plant:'prod_plant',comm_user_perf:'ulb_user_perf',comm_ward_ranking:'ulb_ward_ranking',comm_inspection_perf:'ulb_inspection_perf',comm_iec_oversight:'ulb_iec_issues'} as Record<string,string>)[pageId]||pageId;}
+    if(currentRole==='ULB_OFFICER'){pageId=({comm_dashboard:'ulb_dashboard',comm_map:'ulb_map',comm_zone_ward:'ulb_dashboard',comm_attendance:'ulb_attendance',comm_plant:'prod_plant',comm_user_perf:'ulb_user_perf',comm_ward_ranking:'ulb_ward_ranking',comm_inspection_perf:'ulb_inspection_perf',comm_iec_oversight:'ulb_iec_issues',ulb_reports:'ulb_inspection_perf'} as Record<string,string>)[pageId]||pageId;}
     if (currentRole === 'CITY_ADMIN' || activePageId.startsWith('ca_')) {
       pageId = ({ comm_dashboard: 'ca_dashboard', comm_map: 'ca_map', comm_zone_ward: 'ca_zones_wards', comm_attendance: 'ca_attendance', comm_plant: 'prod_plant', comm_user_perf: 'ca_user_perf', comm_ward_ranking: 'ca_ward_ranking', comm_inspection_perf: 'ca_inspection_perf', comm_iec_oversight: 'ca_iec_oversight', comm_exec_summary: 'ca_exec_summary' } as Record<string, string>)[pageId] || pageId;
     }
