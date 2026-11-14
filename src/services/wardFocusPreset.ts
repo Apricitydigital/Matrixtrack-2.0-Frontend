@@ -25,3 +25,29 @@ export function wardFocusPreset(cityId: string, zones: Zone[], wards: Ward[]) {
   }
   return { zoneIds, wardIds };
 }
+
+export type FocusPreset = { zoneIds: string[]; wardIds: string[] };
+
+/** Option value used by single-choice zone selects for the focus-ward preset. */
+export const FOCUS_SCOPE = '__focus_wards';
+
+export const focusLabel = (preset: FocusPreset) => `${preset.wardIds.length} wards · ${preset.zoneIds.length} zones`;
+
+/** Preset for whichever city the supplied zones belong to (zones/wards may already be city-filtered). */
+export function cityFocusPreset(zones: Zone[], wards: Ward[], cityId = zones[0]?.cityId) {
+  return cityId ? wardFocusPreset(cityId, zones, wards) : null;
+}
+
+/** `quickSelection` prop for a zones MultiSelectDropdown. */
+export function focusQuickSelection(preset: FocusPreset | null, zoneIds: string[], wardIds: string[], apply: (preset: FocusPreset) => void) {
+  if (!preset) return undefined;
+  const same = (a: string[], b: string[]) => a.length === b.length && b.every(id => a.includes(id));
+  return { label: focusLabel(preset), active: same(zoneIds, preset.zoneIds) && same(wardIds, preset.wardIds), onSelect: () => apply(preset) };
+}
+
+/** Single-choice zone filter match that understands the preset sentinel. */
+export function matchesZoneChoice(choice: string, preset: FocusPreset | null, zoneId?: string | null, wardId?: string | null) {
+  if (!choice || choice === 'all') return true;
+  if (choice === FOCUS_SCOPE) return !!preset && !!wardId && preset.wardIds.includes(wardId);
+  return zoneId === choice;
+}

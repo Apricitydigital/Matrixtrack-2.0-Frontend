@@ -1,4 +1,5 @@
 import {ThemeToggle} from '../common/ThemeToggle';
+import {VizToggle} from '../common/VizToggle';
 import {BrandLogo} from '../common/BrandLogo';
 import React from 'react';
 import { RoleType, User, City } from '../../types';
@@ -118,7 +119,7 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <RotateCcw className="w-4 h-4" />
         </button>
-        <ThemeToggle/><button onClick={onLogout} className="text-xs text-slate-600 px-2 py-1 rounded hover:bg-slate-100" title={currentUser.email}>Sign out</button>
+        <VizToggle/><ThemeToggle/><button onClick={onLogout} className="text-xs text-slate-600 px-2 py-1 rounded hover:bg-slate-100" title={currentUser.email}>Sign out</button>
       </div>
     </header>
   );
