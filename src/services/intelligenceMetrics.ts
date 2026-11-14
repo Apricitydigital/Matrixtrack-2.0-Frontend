@@ -16,3 +16,11 @@ export function intelligenceCounts(records:any[]) {
   for(const record of records) if(awaitingSi(record)) counts[intelligenceSuggestion(record).outcome]++;
   return counts;
 }
+
+/** AI suggestion counts for reports still awaiting SI review, within a zone/ward scope. Null while inspections are unknown. */
+export function scopedIntelligence(data:{visits:any[]},scope:{zone?:string;ward?:string}={},known=true) {
+  if(!known) return null;
+  const seen=new Map(data.visits.filter(v=>(!scope.zone||v.zoneId===scope.zone)&&(!scope.ward||v.wardId===scope.ward)).map(v=>[v.id,v]));
+  const c=intelligenceCounts([...seen.values()].map(v=>({...v.raw,status:v.raw?.workspaceStatus||v.status})));
+  return {clean:c.CLEAN,notClean:c.NOT_CLEAN,other:c.UNASSESSABLE+c.AWAITING_AI};
+}
