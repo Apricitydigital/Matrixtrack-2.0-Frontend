@@ -1,3 +1,4 @@
+import {FOCUS_SCOPE,focusLabel,wardFocusPreset} from '../../services/wardFocusPreset';
 import {MultiSelectDropdown} from '../../components/common/MultiSelectDropdown';
 import {ulbReportRegister} from '../../services/ulbReportRegister';
 import {aggregateTargetState} from '../../services/targetConfiguration';
@@ -49,7 +50,9 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
   const cityWards = wards.filter(w => w.cityId === city.id).sort(geographyOrder);
 
   const [selectedZoneId, setSelectedZoneId] = useState('all');
-  const selectableWards = cityWards.filter(w => selectedZoneId === 'all' || w.zoneId === selectedZoneId);
+  const focus = useMemo(() => wardFocusPreset(city.id, zones, wards), [city.id, zones, wards]);
+  const focusName = selectedZoneId === FOCUS_SCOPE && focus ? focusLabel(focus) : '';
+  const selectableWards = cityWards.filter(w => selectedZoneId === 'all' || (selectedZoneId === FOCUS_SCOPE ? !!focus?.wardIds.includes(w.id) : w.zoneId === selectedZoneId));
   const [selectedWardId, setSelectedWardId] = useState<string>(cityWards[0]?.id || '');
 
   const allWards = selectedWardId === 'all';
@@ -59,9 +62,9 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
   const scopeWardIds = scopeWards.map(w => w.id), scopeWardKey = scopeWardIds.join(',');
   const scopeZoneIds = [...new Set(scopeWards.map(w => w.zoneId))], scopeZoneKey = scopeZoneIds.join(',');
   const currentZone = allWards ? (selectedZoneId === 'all' ? undefined : cityZones.find(z => z.id === selectedZoneId)) : cityZones.find(z => z.id === currentWard?.zoneId);
-  const scopeLabel = allWards ? (currentZone ? `${currentZone.name} · All wards (${scopeWards.length})` : `All wards (${scopeWards.length})`) : currentWard?.name || 'Select ward';
+  const scopeLabel = allWards ? (currentZone ? `${currentZone.name} · All wards (${scopeWards.length})` : focusName ? `${focusName} · All wards (${scopeWards.length})` : `All wards (${scopeWards.length})`) : currentWard?.name || 'Select ward';
   const zoneNameOf=(id:string)=>cityZones.find(z=>z.id===id)?.name||'',wardNameOf=(id:string)=>cityWards.find(w=>w.id===id)?.name||'';
-  const scopeZoneName = allWards ? (currentZone?.name || 'All zones') : currentZone?.name;
+  const scopeZoneName = allWards ? (currentZone?.name || focusName || 'All zones') : currentZone?.name;
 
   const [filters,setFilters]=useState(emptyFilters);
   const [figures,setFigures]=useState<ReturnType<typeof summarizeZones>|null>(null),[present,setPresent]=useState<number|null>(null),[issues,setIssues]=useState<number|null>(null),[failed,setFailed]=useState(false),[revision,setRevision]=useState(0);
@@ -132,7 +135,7 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
           <button className="workspace-secondary-button" disabled={!historyComplete||!wardReports.length} onClick={() => printReports(`${scopeLabel} · Inspection Reports`,wardReports)}>Print ward reports with images</button>
           <label className="text-xs font-semibold text-slate-700" htmlFor="ward-zone">Zone:</label>
           <select id="ward-zone" value={selectedZoneId} onChange={e => { setSelectedZoneId(e.target.value); setSelectedWardId(e.target.value === 'all' ? '' : 'all'); }} className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg">
-            <option value="all">All zones</option>{cityZones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+            <option value="all">All zones</option>{focus && <option value={FOCUS_SCOPE}>{focusLabel(focus)}</option>}{cityZones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
           </select>
           <label htmlFor="ward-selector" className="text-xs font-semibold text-slate-700">Ward:</label>
           <select
@@ -141,7 +144,7 @@ export const ZoneWardDetails: React.FC<ZoneWardDetailsProps> = ({
             onChange={(e) => setSelectedWardId(e.target.value)}
             className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 font-bold shadow-2xs"
           >
-            <option value="all">{selectedZoneId === 'all' ? 'All wards' : 'All wards in zone'}</option>
+            <option value="all">{selectedZoneId === 'all' ? 'All wards' : selectedZoneId === FOCUS_SCOPE ? 'All selected wards' : 'All wards in zone'}</option>
             {selectableWards.map(w => (
               <option key={w.id} value={w.id}>{w.name}</option>
             ))}

@@ -1,3 +1,4 @@
+import {focusQuickSelection, wardFocusPreset} from '../../services/wardFocusPreset';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {AlertTriangle, CalendarRange, CheckCircle2, Download, FileBarChart, FileSpreadsheet, FileText, Images, Layers, LayoutGrid, Loader2, MapPin, Printer, RefreshCw} from 'lucide-react';
 import type {City, OperationalReport, Ward, Zone} from '../../types';
@@ -51,6 +52,8 @@ export function ReportsExportsVisual({city, zones, wards, reports: _reports}:{ci
   useEffect(() => { request.current?.abort(); exportRequest.current?.abort(); setData(null); setError(''); setBusy(false); setExporting(false); setExportMessage(''); return () => { request.current?.abort(); exportRequest.current?.abort(); }; }, [scopeKey]);
 
   const cityZones = useMemo(() => zones.filter(z => z.cityId === city.id).sort((a, b) => naturalCompare(a.name, b.name)), [zones, city.id]);
+  const focus = useMemo(() => wardFocusPreset(city.id, zones, wards), [city.id, zones, wards]);
+  const focusSel = focusQuickSelection(focus, selectedZones, selectedWards, p => { setSelectedZones(p.zoneIds); setSelectedWards(p.wardIds); });
   const available = wards.filter(w => w.cityId === city.id && selectedZones.includes(w.zoneId)).sort((a, b) => naturalCompare(a.name, b.name));
   const toggle = (ids:string[], id:string) => ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id];
 
@@ -78,7 +81,7 @@ export function ReportsExportsVisual({city, zones, wards, reports: _reports}:{ci
   }, [city.id]);
   const people = matrixStore.getCollection('users'), personnelComplete = people.status === 'ready' && !people.hasMore, users = matrixStore.getUsers(city.id);
 
-  const zoneLabel = selectedWards.length ? `${selectedWards.length} ward${selectedWards.length === 1 ? '' : 's'}` : selectedZones.length ? (selectedZones.length === cityZones.length ? 'All zones' : cityZones.filter(z => selectedZones.includes(z.id)).map(z => z.name).join(', ')) : 'All zones and wards';
+  const zoneLabel = focusSel?.active ? focusSel.label : selectedWards.length ? `${selectedWards.length} ward${selectedWards.length === 1 ? '' : 's'}` : selectedZones.length ? (selectedZones.length === cityZones.length ? 'All zones' : cityZones.filter(z => selectedZones.includes(z.id)).map(z => z.name).join(', ')) : 'All zones and wards';
   const moduleLabel = selectedModules.length ? selectedModules.map(id => MODULE_LABELS[id as keyof typeof MODULE_LABELS] || id).join(', ') : 'All modules';
   const ctx = (generated:string, scope:string, f = from, t = to):DocContext => ({city: city.name, from: f, to: t, generated, scope, role: ROLE_LABELS[matrixStore.currentUser?.role || 'COMMISSIONER'], brand: REPORT_BRAND});
 
@@ -157,6 +160,7 @@ export function ReportsExportsVisual({city, zones, wards, reports: _reports}:{ci
       <div className="rx-step rx-step-wide"><span>2</span><div><strong>Zones <small>leave empty for the whole city</small></strong>
         <div className="rx-chips" role="group" aria-label="Zones">
           <button type="button" data-on={!selectedZones.length} onClick={() => { setSelectedZones([]); setSelectedWards([]); }}>Whole city</button>
+          {focusSel && <button type="button" data-on={focusSel.active} aria-pressed={focusSel.active} onClick={focusSel.onSelect}>{focusSel.label}</button>}
           {cityZones.map(z => <button type="button" key={z.id} data-on={selectedZones.includes(z.id)} aria-pressed={selectedZones.includes(z.id)} onClick={() => { setSelectedZones(toggle(selectedZones, z.id)); setSelectedWards([]); }}>{z.name}</button>)}
           {cityZones.length > 1 && <button type="button" className="rx-chip-link" onClick={() => { setSelectedZones(cityZones.map(z => z.id)); setSelectedWards([]); }}>Select all</button>}
         </div>
