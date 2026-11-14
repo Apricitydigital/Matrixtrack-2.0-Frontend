@@ -7,7 +7,7 @@ const fmt=(n:number|null|undefined,decimals=0)=>n==null?'—':n.toLocaleString('
 /** Clickable zone cards: selecting a card opens Inspection Performance filtered to that zone. */
 export function ZoneOverviewCards({cards,loading,onSelect}:{cards:ZoneOverviewCard[];loading:boolean;onSelect:(zoneId:string)=>void}) {
   return <section className="home-section zone-overview-cards">
-    <div className="home-section-heading"><div><span><MapPin size={14}/> ZONE PERFORMANCE & WARD INSPECTION OVERVIEW</span><h2>Zone performance & ward inspection overview</h2><p>Select a zone card to open Inspection Performance filtered to that zone.</p></div><span className="zone-overview-count"><Layers size={14}/>{cards.length} {cards.length===1?'Zone':'Zones'} Active</span></div>
+    <div className="home-section-heading"><div><h2>Zone performance & ward inspection overview</h2></div><span className="zone-overview-count"><Layers size={14}/>{cards.length} {cards.length===1?'Zone':'Zones'} Active</span></div>
     <div className="zone-overview-grid">{[...cards].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(c=><button key={c.id} className="zone-overview-card" onClick={()=>onSelect(c.id)} aria-label={`Open inspection performance for ${c.name}`}>
       <div className="zone-overview-top"><span className="zone-overview-name"><MapPin size={12}/>{c.name}</span><small>{c.wards} WARDS</small></div>
       <span className="zone-overview-full-target" title="Registered assets multiplied by selected days; one report per asset per day."><span>Total inspections required<small>At 100% target</small></span><b data-zone-full-target={c.id}>{loading?'\u2026':fmt(c.fullTarget)}</b></span>
