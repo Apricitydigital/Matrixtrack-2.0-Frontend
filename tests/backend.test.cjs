@@ -2406,7 +2406,7 @@ function boundaryTreeNodes(tree){
  if(!tree||typeof tree!=='object')return [];
  return [tree,...boundaryTreeNodes(tree.props?.children)];
 }
-test('boundary layers request geometry explicitly and retain geography filters and stable colors',async()=>{
+test('zone and ward boundaries are always shown together without a visibility selector',async()=>{
  const React=require('react'),savedMemo=React.useMemo,apiModule=require('../src/services/api.ts'),savedApi=apiModule.api;
  const {OperationalMap}=require('../src/components/map/OperationalMap.tsx'),{CityMap}=require('../src/components/map/CityMap.tsx'),{boundaryColor}=require('../src/services/operationsMap.ts');
  const polygon={type:'Polygon',coordinates:[[[75,23],[76,23],[76,24],[75,24],[75,23]]]};
@@ -2416,11 +2416,41 @@ test('boundary layers request geometry explicitly and retain geography filters a
  React.useMemo=read=>read();const harness=reviewHookHarness(),read=()=>OperationalMap({reports:[],currentUser:profile,onSelectReport:()=>{}}),flush=()=>new Promise(setImmediate);
  const find=(tree,match)=>boundaryTreeNodes(tree).find(match),select=(tree,label,value)=>find(tree,n=>n.props?.['aria-label']===label).props.onChange({target:{value}}),map=tree=>find(tree,n=>n.type===CityMap).props;
  try{
-  let tree=harness.render(read);await flush();tree=harness.render(read);assert.match(calls[0],/includeBoundaries=true/);assert.deepEqual(map(tree).boundaries,[]);assert.equal(map(tree).assets.length,1);
-  select(tree,'Boundary layer','ward');tree=harness.render(read);assert.equal(map(tree).boundaries.length,3);const color=boundaryColor(map(tree).boundaries.find(w=>w.id==='w2').id);
-  select(tree,'Map zone','z1');tree=harness.render(read);assert.deepEqual(map(tree).boundaries.map(w=>w.id),['w1','w2']);select(tree,'Map ward','w2');tree=harness.render(read);assert.deepEqual(map(tree).boundaries.map(w=>w.id),['w2']);assert.equal(boundaryColor(map(tree).boundaries[0].id),color);assert.equal(map(tree).assets.length,1);
-  select(tree,'Boundary layer','zone');tree=harness.render(read);assert.deepEqual(map(tree).boundaries.map(z=>z.id),['z1']);assert.ok(boundaryTreeNodes(tree).some(n=>String(n.props?.children).includes('partial zone boundary')));
+  let tree=harness.render(read);await flush();tree=harness.render(read);assert.match(calls[0],/includeBoundaries=true/);assert.equal(map(tree).boundaries.length,5);assert.equal(find(tree,n=>n.props?.['aria-label']==='Boundary layer'),undefined);assert.equal(map(tree).assets.length,1);const color=boundaryColor(map(tree).boundaries.find(w=>w.id==='w2').id);
+  select(tree,'Map zone','z1');tree=harness.render(read);assert.deepEqual(map(tree).boundaries.map(w=>w.id),['z1','w1','w2']);select(tree,'Map ward','w2');tree=harness.render(read);assert.deepEqual(map(tree).boundaries.map(w=>w.id),['z1','w2']);assert.equal(boundaryColor(map(tree).boundaries[1].id),color);assert.equal(map(tree).assets.length,1);
+  find(tree,n=>n.props?.['aria-label']==='Reset map filters').props.onClick();tree=harness.render(read);assert.equal(map(tree).boundaries.length,5);assert.ok(boundaryTreeNodes(tree).some(n=>String(n.props?.children).includes('partial zone boundary')));
  }finally{harness.close();React.useMemo=savedMemo;apiModule.api=savedApi;}
+});
+
+test('map team cards count unique assignments in selected geography and modules and select role-specific locations',async()=>{
+ const React=require('react'),savedMemo=React.useMemo,apiModule=require('../src/services/api.ts'),savedApi=apiModule.api;
+ const {OperationalMap}=require('../src/components/map/OperationalMap.tsx'),{CityMap}=require('../src/components/map/CityMap.tsx');
+ const e={id:'e',name:'Employee One'},d={id:'d',name:'Daroga One'},other={id:'other',name:'Employee Two'};
+ const location=(id,zoneId,wardId,employees,supervisors)=>({id,name:id,latitude:23.5,longitude:75.5,zoneId,wardId,state:'PENDING',employees,supervisors,actors:[{id:'report-only',name:'Former Reporter',role:'SUPERVISOR'}]});
+ const zones=[{id:'z1',name:'Zone 1'},{id:'z2',name:'Zone 2'}],wards=[{id:'w1',zoneId:'z1',name:'Ward 1'},{id:'w2',zoneId:'z1',name:'Ward 2'},{id:'w3',zoneId:'z2',name:'Ward 3'}];
+ apiModule.api=async()=>({filters:{zones,wards},beats:[location('b1','z1','w1',[e,e],[d,d]),location('b2','z1','w2',[e,other],[d]),location('b3','z2','w3',[{id:'outside',name:'Other Zone Employee'}],[{id:'other-d',name:'Other Daroga'}])],toilets:[location('toilet','z1','w1',[],[{id:'toilet-d',name:'Toilet Daroga'}])],boundaries:{zones:[],wards:[]}});
+ React.useMemo=read=>read();const harness=reviewHookHarness(),read=()=>OperationalMap({reports:[],currentUser:profile,onSelectReport:()=>{}}),flush=()=>new Promise(setImmediate);
+ const all=boundaryTreeNodes,find=(tree,match)=>all(tree).find(match),byLabel=(tree,label)=>find(tree,n=>n.props?.['aria-label']===label),select=(tree,label,value)=>byLabel(tree,label).props.onChange({target:{value}}),map=tree=>find(tree,n=>n.type===CityMap).props;
+ const count=(tree,label)=>all(byLabel(tree,label)).find(n=>n.type==='b').props.children;
+ const chip=(tree,label)=>find(tree,n=>n.type==='button'&&Array.isArray(n.props.children)&&n.props.children.includes(label));
+ const chipCount=(tree,label)=>chip(tree,label).props.children.find(n=>n?.type==='span').props.children;
+ try{
+  let tree=harness.render(read);await flush();tree=harness.render(read);assert.equal(count(tree,'Employees count'),3);assert.equal(count(tree,'Darogas count'),3);assert.equal(chipCount(tree,'Sweeping'),3);
+  select(tree,'Map zone','z1');tree=harness.render(read);assert.equal(chipCount(tree,'Sweeping'),2);assert.equal(count(tree,'Employees count'),2);assert.equal(count(tree,'Darogas count'),2);
+  for(const label of ['Cleanliness of Toilet','Litter Bins','Nala','CTU/GVP Transformation'])chip(tree,label).props.onClick();tree=harness.render(read);assert.equal(count(tree,'Darogas count'),1);
+  byLabel(tree,'Employees count').props.onClick();tree=harness.render(read);assert.ok(byLabel(tree,'Employees list'));assert.equal(all(tree).filter(n=>n.props?.className==='map-team-person').length,2);
+  select(tree,'Map status','red');tree=harness.render(read);assert.equal(map(tree).assets.length,0);byLabel(tree,'Show assignments for Employee Two').props.onClick();tree=harness.render(read);assert.deepEqual(map(tree).assets.map(a=>a.id),['b2']);assert.equal(map(tree).focusAssets,true);assert.equal(count(tree,'Employees count'),2);assert.equal(byLabel(tree,'Map status').props.value,'all');
+  select(tree,'Map ward','w1');tree=harness.render(read);assert.deepEqual(map(tree).assets.map(a=>a.id),['b1']);assert.equal(count(tree,'Employees count'),1);assert.equal(map(tree).focusAssets,false);
+  byLabel(tree,'Darogas count').props.onClick();tree=harness.render(read);assert.ok(byLabel(tree,'Darogas list'));byLabel(tree,'Show assignments for Daroga One').props.onClick();tree=harness.render(read);assert.deepEqual(map(tree).assets.map(a=>a.id),['b1']);
+ }finally{harness.close();React.useMemo=savedMemo;apiModule.api=savedApi;}
+});
+
+test('assigned map people deduplicate IDs and locations but keep employee and Daroga roles distinct',()=>{
+ const {mapAssignedPeople,mapAssetHasStaff}=require('../src/services/operationsMap.ts');
+ const person={id:'both',name:'Same Name'},base={module:'sweeping',actors:[{id:'former',name:'Report Submitter',role:'SUPERVISOR'}],employees:[person,person,{id:'another',name:'Same Name'}],supervisors:[person]};
+ const assets=[{...base,key:'b1'},{...base,key:'b2',employees:[],supervisors:[]}];
+ const people=mapAssignedPeople(assets);assert.equal(people.length,3);assert.ok(!people.some(p=>p.id==='former'));assert.deepEqual(people.find(p=>p.id==='both'&&p.role==='EMPLOYEE').locationKeys,['b1']);
+ assert.equal(mapAssetHasStaff({...assets[0],supervisors:[]},'both','SUPERVISOR'),false);assert.equal(mapAssetHasStaff(assets[0],'both','EMPLOYEE'),true);assert.equal(mapAssetHasStaff(assets[0],'former','SUPERVISOR'),false);
 });
 
 test('successful boundary save stays acknowledged when refreshing the directory fails',async()=>{

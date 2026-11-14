@@ -6,6 +6,35 @@ export function boundaryColor(id:string):string {
   let hash=0;for(const char of id)hash=(Math.imul(hash,31)+char.charCodeAt(0))>>>0;
   return BOUNDARY_COLORS[hash%BOUNDARY_COLORS.length];
 }
+export type MapTeamRole='EMPLOYEE'|'SUPERVISOR';
+export interface MapTeamPerson {id:string;name:string;role:MapTeamRole;locationKeys:string[];modules:OperationalModuleId[];}
+/** Assignment arrays are authoritative; report actors may include former assignees and reviewers. */
+export function mapAssignedPeople(assets:MapAsset[]):MapTeamPerson[]{
+  const people=new Map<string,MapTeamPerson>();
+  for(const asset of assets)for(const [role,assigned] of [['EMPLOYEE',asset.employees],['SUPERVISOR',asset.supervisors]] as const){
+    for(const person of assigned||[]){
+      if(!person?.id)continue;
+      const key=`${role}:${person.id}`,existing=people.get(key)||{id:person.id,name:person.name||'Name unavailable',role,locationKeys:[],modules:[]};
+      if(!existing.locationKeys.includes(asset.key))existing.locationKeys.push(asset.key);
+      if(!existing.modules.includes(asset.module))existing.modules.push(asset.module);
+      people.set(key,existing);
+    }
+  }
+  return [...people.values()].sort((a,b)=>a.name.localeCompare(b.name)||a.id.localeCompare(b.id));
+}
+export function mapAssetHasStaff(asset:MapAsset,id:string,role?:MapTeamRole|''):boolean {
+  const people=role==='EMPLOYEE'?asset.employees:role==='SUPERVISOR'?asset.supervisors:[...asset.actors,...asset.supervisors,...asset.employees];
+  return people.some(p=>p.id===id);
+}
+/** Keep both geographic levels visible, including the selected Ward's parent Zone. */
+export function scopedMapBoundaries(data:any,zone:string,ward:string){
+  const allWards=data?.boundaries?.wards||[];
+  const parentZone=zone||(ward?(data?.filters?.wards||[]).find((w:any)=>w.id===ward)?.zoneId||allWards.find((w:any)=>w.id===ward)?.zoneId:'');
+  return [
+    ...(data?.boundaries?.zones||[]).filter((b:any)=>!parentZone||b.id===parentZone).map((b:any)=>({...b,level:'zone'})),
+    ...allWards.filter((b:any)=>(!parentZone||b.zoneId===parentZone)&&(!ward||b.id===ward)).map((b:any)=>({...b,level:'ward'})),
+  ];
+}
 export function validCoordinates(lat:unknown,lng:unknown):[number,number]|undefined {
   if(lat===null||lng===null||lat===undefined||lng===undefined||lat===''||lng==='')return;
   const a=Number(lat),b=Number(lng);return Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a)<=90&&Math.abs(b)<=180&&(a!==0||b!==0)?[a,b]:undefined;
