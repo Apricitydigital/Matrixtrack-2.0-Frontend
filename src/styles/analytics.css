@@ -23,3 +23,17 @@
 .status-breakdown-legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 24px;margin-top:20px}.status-breakdown-legend>button{display:flex;align-items:center;gap:10px;text-align:left;padding:10px 0;border-bottom:1px solid var(--line,#e6eef3);color:var(--ink,#31566e)}.status-breakdown-legend>button:disabled{opacity:1;cursor:default}.status-breakdown-legend>button>i{width:9px;height:9px;border-radius:50%;flex-shrink:0}.status-breakdown-legend>button>span{flex:1;font-size:14px}.status-breakdown-legend strong{font-size:20px;font-variant-numeric:tabular-nums}.status-breakdown-legend small{font-size:12px;color:var(--muted,#718b9f)}.status-breakdown-legend>button>span>small{display:block}.status-source-link{display:flex;align-items:center;gap:7px;margin:0 24px 20px;color:var(--ink,#31566e);font-size:13px}.ward-availability{padding:18px 24px}.ward-availability summary{cursor:pointer;font-weight:600}.ward-availability p{margin:10px 0;color:var(--muted,#718b9f)}.ward-availability table{width:100%;font-size:13px}.ward-availability th,.ward-availability td{padding:12px;text-align:left;border-bottom:1px solid var(--line,#e6eef3)}
 @media(max-width:600px){.status-breakdown{padding:18px}.status-breakdown-legend{grid-template-columns:1fr}.ward-availability{padding:15px;overflow:auto}}
 @media print{.status-breakdown-track span,.status-breakdown-legend i{print-color-adjust:exact;-webkit-print-color-adjust:exact}.status-breakdown{break-inside:avoid}}
+
+/* Compact selected Ward Ranking calculation. */
+.compact-score-evidence{gap:24px;align-items:start}
+.compact-score-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.compact-score-heading h3{margin:0}.compact-score-heading>strong{color:var(--ink,#355e77);font-size:20px;white-space:nowrap}
+.compact-score-table{width:100%;border-collapse:collapse;font-size:13px;color:var(--ink,#486d83)}
+.compact-score-table th{font-size:11px;color:var(--muted,#829baa);font-weight:500;text-align:left;padding:8px;border-bottom:1px solid var(--line,#e6edf2)}
+.compact-score-table td{padding:11px 8px;border-bottom:1px solid var(--line,#e6edf2)}
+.compact-score-table :is(th,td):last-child{text-align:right;white-space:nowrap}
+.compact-score-total{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:14px;padding:12px;background:var(--surface-soft,#f1f7f8);border-radius:8px}
+.compact-score-total>span{font-size:12px;color:var(--muted,#829baa)}.compact-score-total>strong{font-size:15px;color:var(--ink,#355e77)}
+.compact-score-note{display:block;margin-top:8px;color:var(--muted,#829baa);font-size:11px}
+.compact-score-evidence .ranking-extra-metrics{padding:12px 0}
+@media(max-width:600px){.compact-score-table{font-size:12px}.compact-score-table :is(th,td){padding:9px 4px}.compact-score-total>strong{font-size:14px}}

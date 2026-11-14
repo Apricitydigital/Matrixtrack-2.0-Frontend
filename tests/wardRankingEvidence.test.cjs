@@ -2,9 +2,11 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 require.extensions['.ts']=(module,filename)=>module._compile(ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,filename);
 const {rankingEvidence,rankingFormula}=require('../src/services/wardRankingEvidence.ts');
 test('workforce evidence distinguishes employee-days, missing records and absence without deployment claims',()=>{
- const e=rankingEvidence('workforce',{manpowerScheduled:90,present:70,uniqueScheduledEmployees:45,confirmedAbsent:5,attendanceNotFound:15,attendanceNeedsReview:0,correctlyDeployed:70,unmannedBeats:3});
- assert.equal(e.primary.find(x=>x.id==='manpowerScheduled').label,'Scheduled employee-days');
- assert.equal(e.primary.find(x=>x.id==='uniqueScheduledEmployees').value,45);
+ const e=rankingEvidence('workforce',{manpowerScheduled:90,present:70,matchedAttendance:75,uniqueScheduledEmployees:45,confirmedAbsent:5,attendanceNotFound:15,attendanceNeedsReview:0,correctlyDeployed:70,unmannedBeats:3});
+ assert.equal(e.primary.find(x=>x.id==='manpowerScheduled').label,'Scheduled');
+ assert.equal(e.primary.length,4);
+ assert.ok(!e.primary.some(x=>x.id==='uniqueScheduledEmployees'));
+ assert.ok(e.additional.some(([key,value])=>key==='uniqueScheduledEmployees'&&value===45));
  assert.ok(e.primary.find(x=>x.id==='attendanceNotFound').help.includes('Names are not used'));
  assert.ok(![...e.primary,...e.additional].some(x=>x.id==='correctlyDeployed'||x[0]==='correctlyDeployed'));
  assert.equal(rankingFormula('workforce','deployment',{present:35,manpowerScheduled:45}),'Matched present / scheduled employee-days: 35 / 45');
@@ -15,4 +17,26 @@ test('module formulas preserve work denominators and target overrides',()=>{
  assert.equal(rankingFormula('supervisor','submissionCoverage',{targetBased:true,targetsMet:3,assignedTargets:4}),'Achieved / assigned targets: 3 / 4');
  assert.equal(rankingFormula('toilet','quality',{evidenceMatchedChecks:7,evidenceEvaluatedChecks:10}),'Evidence checks passed / evaluated: 7 / 10');
  assert.equal(rankingFormula('workforce','deployment',{}),'');
+});
+
+test('selected score exposes the exact active subtotal behind 19.86 and excludes N/A shift',()=>{
+ const {scoreCalculation}=require('../src/services/wardRankingEvidence.ts');
+ const result=scoreCalculation({components:{deployment:{score:11.67,maxScore:18,applicable:true},shiftCompliance:{score:0,maxScore:6,applicable:false},supervisorAvailability:{score:2.5,maxScore:3,applicable:true},unmannedBeatControl:{score:1.72,maxScore:3,applicable:true}}});
+ assert.equal(result.parts.length,3);assert.equal(result.available,24);assert.equal(Number((result.earned/result.available*30).toFixed(2)),19.86);
+ assert.equal(scoreCalculation({components:{reviewCoverage:{score:4,maxScore:10,applicable:true}}}).earned,4);
+});
+
+test('IEC calculation includes action completion only, excluding legacy diagnostic scores',()=>{
+ const {scoreCalculation}=require('../src/services/wardRankingEvidence.ts');
+ const result=scoreCalculation({key:'actionOfficer',components:{acknowledgement:{score:1,maxScore:1,applicable:true},actionCompletion:{score:6.47,maxScore:10,applicable:true},closureEvidence:{score:2,maxScore:2,applicable:true}}});
+ assert.deepEqual(result.parts.map(p=>p.key),['actionCompletion']);assert.equal(result.earned,6.47);assert.equal(result.available,10);
+});
+
+test('compact selected evidence renders the score equation and keeps extra counts collapsed',()=>{
+ require.extensions['.tsx']=(module,filename)=>module._compile(ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.React,esModuleInterop:true}}).outputText,filename);
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ const {WardScoreBreakdown}=require('../src/components/analytics/WardScoreBreakdown.tsx');
+ const html=renderToStaticMarkup(React.createElement(WardScoreBreakdown,{factor:{key:'workforce',label:'Workforce attendance',score:19.86,maxScore:30,metrics:{manpowerScheduled:162,present:105,matchedAttendance:136,attendanceNotFound:26,uniqueScheduledEmployees:27},components:{deployment:{score:11.67,maxScore:18,applicable:true},shiftCompliance:{score:0,maxScore:6,applicable:false},supervisorAvailability:{score:2.5,maxScore:3,applicable:true},unmannedBeatControl:{score:1.72,maxScore:3,applicable:true}}}}));
+ assert.match(html,/15.89 \/ 24/);assert.match(html,/= 19.86/);assert.match(html,/Matched with attendance sheet/);
+ assert.match(html,/<details[^>]*><summary>More details<\/summary>/);assert.doesNotMatch(html,/Unique Employee ID|weighted achievement|insight-bar-chart/);
 });

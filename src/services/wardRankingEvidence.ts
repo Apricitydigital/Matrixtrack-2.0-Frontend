@@ -13,7 +13,11 @@ const beatFields:Record<string,[string,string]>={
 
 export function rankingEvidence(key:string,metrics:Record<string,unknown>) {
  const entries=Object.entries(metrics||{}).filter(([,v])=>typeof v==='boolean'||typeof v==='number'&&Number.isFinite(v));
- if(key==='workforce')return {primary:Object.entries(workforceFields).filter(([id])=>metrics[id]!==undefined).map(([id,[label,help]])=>({id,label,help,value:metrics[id]})),additional:entries.filter(([id])=>!workforceFields[id]&&!['correctlyDeployed','unmannedBeats','shiftCompliant'].includes(id))};
+ if(key==='workforce') {
+  const primary=['matchedAttendance','present','manpowerScheduled','attendanceNotFound'];
+  const labels:Record<string,string>={matchedAttendance:'Matched with attendance sheet',present:'Present',manpowerScheduled:'Scheduled',attendanceNotFound:'Attendance not found'};
+  return {primary:primary.filter(id=>metrics[id]!==undefined).map(id=>({id,label:labels[id],help:workforceFields[id][1],value:metrics[id]})),additional:entries.filter(([id])=>!primary.includes(id)&&!['correctlyDeployed','unmannedBeats','shiftCompliant'].includes(id))};
+ }
  if(key!=='beat')return {primary:entries.slice(0,8).map(([id,value])=>({id,value,label:'',help:''})),additional:entries.slice(8)};
  return {primary:Object.entries(beatFields).filter(([id])=>metrics[id]!==undefined).map(([id,[label,help]])=>({id,label,help,value:metrics[id]})),additional:entries.filter(([id])=>!beatFields[id])};
 }
@@ -53,4 +57,9 @@ export function rankingFormula(key:string,part:string,m:Record<string,any>) {
  if(part==='eliminationProgress')return ratio('eliminatedPoints','totalPoints','Verified eliminated / registered points');
  if(part==='completeBeatCoverage')return ratio('completeBeatCoverage','beatsDue','Complete visits / required visits');
  return '';
+}
+
+export function scoreCalculation(factor:any) {
+ const parts=Object.entries(factor?.components||{}).filter(([key,p]:[string,any])=>(factor.key!=='actionOfficer'||key==='actionCompletion')&&p.applicable!==false&&Number.isFinite(p.score)&&Number.isFinite(p.maxScore)&&p.maxScore>0).map(([key,p]:[string,any])=>({key,...p}));
+ return {parts,earned:parts.reduce((sum,p)=>sum+p.score,0),available:parts.reduce((sum,p)=>sum+p.maxScore,0)};
 }
