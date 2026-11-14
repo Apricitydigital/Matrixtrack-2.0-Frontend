@@ -6,6 +6,8 @@ import '../src/styles/commissioner-overview.css';
 import '../src/styles/inspection-targets.css';
 import '../src/styles/insight-history-map.css';
 import '../src/styles/themes.css';
+import '../src/styles/visual-charts.css';
+import '../src/styles/visual-reports.css';
 import '../src/styles/ulb-dashboard.css';
 import '../src/styles/intelligence.css';
 

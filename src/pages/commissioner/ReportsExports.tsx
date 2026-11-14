@@ -23,8 +23,17 @@ import { MODULE_LABELS } from '../../services/presentation';
 import { printElement } from '../../services/print';
 import { printReports } from '../../components/reports/ReportDocument';
 import { Pagination, usePagination } from '../../components/common/Pagination';
+import { useVisual } from '../../services/vizMode';
+import { ReportsExportsVisual } from './ReportsExportsVisual';
 
-export function ReportsExports({city,zones,wards,reports}:{city:City;zones:Zone[];wards:Ward[];reports:OperationalReport[]}) {
+type ReportsExportsProps={city:City;zones:Zone[];wards:Ward[];reports:OperationalReport[]};
+/** Visual mode gets its own page component, so switching modes never changes a component's hook order. */
+export function ReportsExports(props:ReportsExportsProps) {
+  if(typeof document==='undefined')return ReportsExportsClassic(props);
+  return <ReportsModeSwitch {...props}/>;
+}
+function ReportsModeSwitch(props:ReportsExportsProps){return useVisual()?<ReportsExportsVisual {...props}/>:<ReportsExportsClassic {...props}/>;}
+export function ReportsExportsClassic({city,zones,wards,reports}:ReportsExportsProps) {
   const [selectedZones,setSelectedZones]=useState<string[]>([]),[selectedWards,setSelectedWards]=useState<string[]>([]),[data,setData]=useState<any>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[images,setImages]=useState(true);
   const [selectedModules,setSelectedModules]=useState<string[]>([]);
   const scopeCity={...city,enabledModules:city.enabledModules.filter(id=>!selectedModules.length||selectedModules.includes(id))};
