@@ -14,7 +14,7 @@ export function inspectionPeriod(counts:CoverageCounts,delivery:TargetDelivery,f
     requirement:'Inspection target',
     basis:counts.total==null||counts.required==null?'Location inventory is unavailable, so the inspection target cannot be calculated.':`${number(counts.total)} registered locations × ${duration} = ${number(counts.required)} inspection opportunities`,
     progress:delivery.target==null?'Inspection target unavailable':delivery.completed==null?'Inspection credit unavailable':`${number(delivery.completed)} ${delivery.fallback?'inspections done':'credited inspections'} / ${number(delivery.target)} inspection target`,
-    rule:delivery.fallback?'One credit per registered location per day. Same-day repeat visits add no credit. Draft reports are excluded. Pending review reports are completed field visits awaiting a decision.':'Credit follows the configured target rules returned by the backend.',
+    rule:delivery.fallback?'One credit per registered location per day. Same-day repeat visits add no credit.Pending review reports are completed field visits awaiting a decision.':'Credit follows the configured target rules returned by the backend.',
   };
 }
 

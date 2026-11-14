@@ -5,7 +5,7 @@ import type { InspectionFigures } from './commissioner';
 import type { OperationalModuleId } from '../types';
 
 export type InspectionScope={module?:OperationalModuleId;zone?:string;ward?:string};
-/** Report records reconcile to status totals; completed visits and asset reach exclude Draft. */
+/** Report records reconcile to status totals; completed visits and asset reach exclude reports not yet submitted. */
 export function inspectionMetrics(data:InspectionCoverage,scope:InspectionScope={},figures?:InspectionFigures|null) {
   const records=coverageCounts(data,scope);
   const completedData={...data,visits:data.visits.filter(v=>inspectionStatus(v.status||'SUBMITTED')!=='unclassified')};
