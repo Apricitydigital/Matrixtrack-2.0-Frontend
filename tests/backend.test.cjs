@@ -1416,8 +1416,8 @@ test('module cards keep required total independent when targets change and disti
   const React = require('react'), { renderToStaticMarkup } = require('react-dom/server'), { ModuleDelivery } = require('../src/pages/commissioner/ModuleDelivery.tsx');
   const official = summarizeZones({ zones: [{ modules: [{ module: 'TOILET', target: 9, targetConfigured: true, completed: 5, siPending: 3, cleaned: 2, notCleaned: 1, actionRequired: 1, actionTaken: 2 }] }] });
   const html = renderToStaticMarkup(React.createElement(ModuleDelivery, { modules: ['toilets'], pulse: { official, pending: 0, errors: {} }, data, loading: false, zone: '', ward: '', onInspect: () => { } }));
-  assert.match(html, /inspection-module-card/); assert.doesNotMatch(html, /<table/); assert.match(html, /data-metric="pending">0/); assert.match(html, /data-metric="completed">5/); assert.match(html, /data-metric="achievement" data-met="true">100%/); assert.match(html, /data-metric="pending_review">3/); assert.match(html, /data-metric="action_taken">2/);
-  const { COMMISSIONER_TERMS } = require('../src/services/commissionerTerms.ts'); for (const key of ['target', 'pending', 'pendingReview', 'cleaned', 'notCleaned', 'unique', 'repeated', 'coverage', 'actionRequired', 'actionTaken']) assert.ok(html.includes(COMMISSIONER_TERMS[key]), key);
+  assert.match(html, /inspection-module-card/); assert.doesNotMatch(html, /<table/); assert.doesNotMatch(html, /inspection-card-details|Target &amp; action details/); assert.match(html, /data-metric="pending-locations">78/); assert.match(html, /data-module-ai="toilets"/); assert.match(html, /data-metric="achievement" data-met="true">100%/); assert.match(html, /data-metric="pending_review">3/); assert.match(html, /data-metric="action_taken">2/);
+  const { COMMISSIONER_TERMS } = require('../src/services/commissionerTerms.ts'); for (const key of ['target', 'pending', 'pendingReview', 'cleaned', 'notCleaned', 'unique', 'coverage', 'actionRequired', 'actionTaken']) assert.ok(html.includes(COMMISSIONER_TERMS[key]), key);
 });
 
 test('a numeric backend target is not evidence of configuration, and empty saved targets override an unverified reference', () => {
@@ -1450,7 +1450,7 @@ test('compact cards fall back to total inspections required and keep duplicated 
   const React = require('react'), { renderToStaticMarkup } = require('react-dom/server'), { ModuleDelivery } = require('../src/pages/commissioner/ModuleDelivery.tsx');
   const html = renderToStaticMarkup(React.createElement(ModuleDelivery, { modules: ['toilets'], pulse: { official, pending: 0, errors: {} }, data, loading: false, zone: '', ward: '', onInspect: () => { } }));
   assert.match(html, /data-metric="target" data-state="full_coverage">87/); assert.match(html, /data-metric="achievement"/); assert.match(html, /data-metric="entities">87/);
-  const [front, details] = html.split('<details class="inspection-card-details"'); assert.doesNotMatch(front, /data-metric="completed"|data-metric="reference"/); assert.match(front, /data-metric="inspections">1/); assert.doesNotMatch(details, /Backend reference count/); assert.match(details, /data-metric="pending">86/);
+  assert.doesNotMatch(html, /inspection-card-details|data-metric="completed"|data-metric="reference"|Backend reference count/); assert.match(html, /data-metric="inspections">1/); assert.match(html, /data-metric="pending-locations">86/);
   const context = { city: { id: 'city-a', name: 'Test City' }, from: '2026-10-31', to: '2026-10-31', zones: [], wards: [], coverage: data, pulse: { official, pending: 0, errors: {} } };
   const answer = answerInsight('Is a target set for toilets?', context).text; assert.match(answer, /Inspection target: 87/); assert.match(answer, /The inspection target is current registered locations multiplied by selected days/); assert.match(answer, /Pending inspections: 86/); assert.doesNotMatch(answer, /Not verified|Backend reference count/);
 });
@@ -2388,7 +2388,7 @@ test('Commissioner overview renders multi-zone and ward totals consistently acro
  try{
   const html=renderToStaticMarkup(React.createElement(CommissionerHome,{city:{id:'c',name:'City',enabledModules:['sweeping']},zones,wards,reports:[],currentUser:{id:'comm',role:'COMMISSIONER'},noticeRequest:0,onNavigate:()=>{},onSelectReport:()=>{},onInspect:()=>{},onNoticeCount:()=>{}}));
   assert.deepEqual(requested,{z:['z1','z2'],w:['w1','w3'],geo:['z1','z2']});assert.match(html,/2 zones selected/);assert.match(html,/2 wards selected/);
-  assert.match(html,/data-target-progress="target">20</);assert.match(html,/data-target-progress="received">2</);assert.match(html,/data-target-progress="remaining">18</);
+  assert.doesNotMatch(html,/data-target-progress=/);assert.match(html,/CLEANLINESS INSIGHTS/);
   assert.match(html,/data-metric="overview-inspections">2</);assert.match(html,/data-outcome="NOT_CLEAN"[^]*?<strong>2<\/strong>/);assert.match(html,/data-metric="entities">2</);assert.match(html,/66.7%/);assert.doesNotMatch(html,/>Ward 2<|>Ward 4<|>Zone 3</);
  }finally{React.useState=savedState;coverageHook.useInspectionCoverage=savedCoverage;commissioner.useCityPulse=savedPulse;}
 });

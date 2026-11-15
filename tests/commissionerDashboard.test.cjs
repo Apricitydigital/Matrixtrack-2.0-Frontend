@@ -17,6 +17,7 @@ const {UlbDashboard}=require('../src/pages/ulbofficer/UlbDashboard.tsx');
 const {Drawer}=require('../src/components/common/Drawer.tsx');
 const {OperationalFilters}=require('../src/components/common/OperationalFilters.tsx');
 const {ModuleDelivery}=require('../src/pages/commissioner/ModuleDelivery.tsx');
+const {PanelScope,PanelActions}=require('../src/components/dashboard/DetailPanel.tsx');
 const {ReportsExports}=require('../src/pages/commissioner/ReportsExports.tsx');
 const {ReportDataReview}=require('../src/pages/commissioner/ReportDataReview.tsx');
 const {ZoneWardDetails}=require('../src/pages/commissioner/ZoneWardDetails.tsx');
@@ -35,7 +36,14 @@ const users={u:{performance:2.4,rows:wards.flatMap(w=>['SWEEPING','TOILET'].map(
 const props={city,zones,wards,reports:[],currentUser:{id:'comm',role:'COMMISSIONER'},noticeRequest:0,onNavigate:()=>{},onSelectReport:()=>{},onInspect:()=>{},onNoticeCount:()=>{}};
 
 function find(node,predicate){if(!node||typeof node!=='object')return undefined;if(predicate(node))return node;for(const child of React.Children.toArray(node.props?.children)){const result=find(child,predicate);if(result)return result;}}
+<<<<<<< Updated upstream
 function harness(){
+=======
+/** The Commissioner target figures moved from the removed daily-target strip into the Report target progress panel. */
+function targetPanel(h,component=CommissionerHome,values=props){let tree=h.render(component,values);find(tree,n=>n.props?.className==='target-kpi'&&find(n,c=>c.props?.['data-target-state']!==undefined)).props.onClick();tree=h.render(component,values);return renderToStaticMarkup(tree);}
+function panelBody(tree){return find(tree,n=>n.type===PanelScope)?.props.panel?.body;}
+function harness(initialSlots=[]){
+>>>>>>> Stashed changes
  const originals={useState:React.useState,useEffect:React.useEffect,useRef:React.useRef,useMemo:React.useMemo,useCallback:React.useCallback};
  const savedCoverage=coverageHook.useInspectionCoverage,savedPulse=commissioner.useCityPulse,savedRange=matrixStore.getDateRange,slots=[];
  coverageHook.useInspectionCoverage=()=>({loading:false,data});
@@ -52,7 +60,8 @@ test('Commissioner 6-zone/15-ward shortcut reconciles configured targets, groupe
   tree=h.render();const html=renderToStaticMarkup(tree);
   assert.equal(find(tree,n=>n.type===MultiSelectDropdown&&n.props.label==='Zones').props.quickSelection.active,true);
   assert.match(html,/6 zones selected/);assert.match(html,/15 wards selected/);assert.doesNotMatch(html,/>Ward 99<|>Ward 100<|>Zone 7</);
-  assert.match(html,/data-target-progress="target">135</);assert.match(html,/data-target-progress="received">30</);assert.match(html,/data-target-progress="remaining">105</);
+  assert.doesNotMatch(html,/data-target-progress=/);
+  const panel=targetPanel(h);assert.match(panel,/data-target-progress="target">135</);assert.match(panel,/data-target-progress="received">30</);assert.match(panel,/data-target-progress="remaining">105</);
   assert.match(html,/data-metric="overview-inspections">30</);assert.match(html,/data-team-progress="SUPERVISOR">22.2%/);
   assert.match(html,/data-team-progress="QC">86.7%/);assert.match(html,/data-team-progress="ACTION_OFFICER">50%/);
   assert.doesNotMatch(html,/avg\. score|Daroga scoring credit:|99%/);
@@ -67,9 +76,12 @@ test('module selection, period target and report drill retain the same selected 
   tree=h.render(CommissionerHome,{...props,onInspect:(...args)=>drills.push(args)});
   find(tree,n=>n.type===MultiSelectDropdown&&n.props.label==='Modules').props.onChange(['sweeping']);
   tree=h.render(CommissionerHome,{...props,onInspect:(...args)=>drills.push(args)});let html=renderToStaticMarkup(tree);
-  assert.match(html,/data-target-progress="target">90</);assert.match(html,/data-target-progress="received">16</);assert.match(html,/data-target-progress="remaining">74</);
+  const panel=targetPanel(h,CommissionerHome,{...props,onInspect:(...args)=>drills.push(args)});assert.match(panel,/data-target-progress="target">90</);assert.match(panel,/data-target-progress="received">16</);assert.match(panel,/data-target-progress="remaining">74</);
+  tree=h.render(CommissionerHome,{...props,onInspect:(...args)=>drills.push(args)});
   assert.match(html,/data-team-progress="SUPERVISOR">17.8%/);assert.doesNotMatch(html,/data-module="toilets"/);
+  // Cards open a detail panel; its primary action keeps the original drill.
   find(tree,n=>n.props?.className==='target-kpi'&&find(n,c=>c.props?.['data-metric']==='overview-inspections')).props.onClick();
+  tree=h.render(CommissionerHome,{...props,onInspect:(...args)=>drills.push(args)});find(panelBody(tree),n=>n.type===PanelActions).props.actions[0].onClick();
   const preset=wardFocusPreset('c',zones,wards);assert.deepEqual(drills[0],[['sweeping'],'inspections_completed',preset.zoneIds,preset.wardIds]);
   const filters=inspectionDrillFilters(drills[0][2],drills[0][3],drills[0][0],drills[0][1]);
   assert.deepEqual(filters.moduleIds,['sweeping']);assert.equal(filters.moduleId,'all');assert.equal(filters.status,'inspections_completed');
@@ -110,7 +122,7 @@ test('an incomplete module cannot become a zero score and does not block another
   assert.match(html,/data-metric="overview-inspections">—</);assert.match(html,/data-team-progress="SUPERVISOR">—</);
   find(tree,n=>n.type===MultiSelectDropdown&&n.props.label==='Modules').props.onChange(['toilets']);
   tree=h.render();html=renderToStaticMarkup(tree);
-  assert.match(html,/data-target-progress="target">45</);assert.match(html,/data-target-progress="received">14</);
+  const panel=targetPanel(h);assert.match(panel,/data-target-progress="target">45</);assert.match(panel,/data-target-progress="received">14</);
   assert.match(html,/data-team-progress="SUPERVISOR">31.1%/);
  }finally{h.close();}
 });
@@ -194,18 +206,19 @@ test('Commissioner and ULB show 100% inspection baseline before configured targe
    let tree=h.render(component,values);
    find(tree,n=>n.type===MultiSelectDropdown&&n.props.label==='Zones').props.quickSelection.onSelect();
    tree=h.render(component,values);let html=renderToStaticMarkup(tree);
-   assert.match(html,/data-target-progress="full-target">675</);
-   assert.ok(html.indexOf('data-target-progress="full-target"')<html.indexOf('data-target-progress="target"'));
+   const ulb=component===UlbDashboard,targets=()=>ulb?html:targetPanel(h,component,values);
+   let shown=targets();assert.match(shown,/data-target-progress="full-target">675</);
+   assert.ok(shown.indexOf('data-target-progress="full-target"')<shown.indexOf('data-target-progress="target"'));
    assert.match(html,/class="zone-overview-full-target"[^>]*><span>Total inspections required<small>At 100% target<\/small><\/span>/);
    assert.match(html,/data-zone-full-target="z1">180</);assert.match(html,/data-zone-full-target="z2">135</);
    find(tree,n=>n.type===MultiSelectDropdown&&n.props.label==='Modules').props.onChange(['toilets']);
    tree=h.render(component,values);html=renderToStaticMarkup(tree);
-   assert.match(html,/data-target-progress="full-target">225</);assert.match(html,/data-zone-full-target="z1">60</);
+   assert.match(targets(),/data-target-progress="full-target">225</);assert.match(html,/data-zone-full-target="z1">60</);
    // The full baseline comes from inventory and dates, independently of target loading.
    commissioner.useCityPulse=()=>({pending:1,errors:{},performance:undefined,rankings:[]});
-   tree=h.render(component,values);html=renderToStaticMarkup(tree);assert.match(html,/data-target-progress="full-target">225</);
+   tree=h.render(component,values);html=renderToStaticMarkup(tree);assert.match(targets(),/data-target-progress="full-target">225</);
    coverageHook.useInspectionCoverage=()=>({loading:false,data:{...data,inventoryAvailable:false}});
-   tree=h.render(component,values);html=renderToStaticMarkup(tree);assert.doesNotMatch(html,/data-target-progress="full-target">0</);
+   tree=h.render(component,values);html=renderToStaticMarkup(tree);assert.doesNotMatch(targets(),/data-target-progress="full-target">0</);
   }finally{h.close();}
  }
 });
