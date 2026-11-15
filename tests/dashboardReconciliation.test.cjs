@@ -36,12 +36,12 @@ test('one ULB beat register reconciles totals, statuses, modules, wards, SI, pro
  assert.deepEqual(ulbReportRegister(normalized),normalized,'normalization is idempotent');
  const scope=ulbScopeData(selected),{ulbDrillVisits}=require('../src/services/ulbDashboard.ts');
  assert.equal(scope.counts.inspections,4);assert.equal(scope.completedCounts.inspections,3);
- assert.equal(scope.statusCount('unclassified'),1);assert.equal(scope.statusCount('pending_review'),1);
+ assert.equal(scope.statusCount('unclassified'),0);assert.equal(scope.statusCount('pending_review'),2);
  assert.equal(scope.statusCount('approved'),1);assert.equal(scope.statusCount('action_taken'),1);
  assert.equal(scope.completedCounts.covered,2);assert.equal(scope.completedCounts.repeats,1);
  assert.equal(ulbDrillVisits(scope,'inspections_completed').length,3);
  assert.equal(ulbScopeData(selected,{module:'sweeping'}).completedCounts.inspections,2);
- assert.equal(ulbDrillVisits(ulbScopeData(selected,{module:'sweeping'}),'pending_review').length,1);
+ assert.equal(ulbDrillVisits(ulbScopeData(selected,{module:'sweeping'}),'pending_review').length,2);
  const modules=selected.modules.map(module=>inspectionMetrics(selected,{module}));
  assert.equal(modules.reduce((n,m)=>n+m.achieved,0),3);
  const delivery=targetDelivery({target:10,completed:1,targetState:'configured',targetPercent:20});

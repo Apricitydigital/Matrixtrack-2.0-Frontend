@@ -131,7 +131,7 @@ test('ward table uses the configured range target; fallback and unavailable targ
  const fallback=renderToStaticMarkup(React.createElement(WardReportProgress,{...args,targetRows:[]}));
  assert.match(fallback,/data-ward-metric="target">45</);
  const unavailable=renderToStaticMarkup(React.createElement(WardReportProgress,{...args,targetsReady:false}));
- assert.match(unavailable,/data-ward-metric="target">—</);assert.match(unavailable,/data-ward-metric="remaining">—</);
+ assert.match(unavailable,/data-ward-metric="target">N\/A</);assert.match(unavailable,/data-ward-metric="remaining">N\/A</);
  assert.match(unavailable,/data-ward-metric="received"><button>2</);
 });
 
@@ -140,7 +140,7 @@ test('an incomplete module cannot become a zero score and does not block another
   coverageHook.useInspectionCoverage=()=>({loading:false,data:{...data,visits:[...data.visits,{...data.visits[0],id:'missing-day',submittedAt:undefined}]}});
   let tree=h.render();find(tree,n=>n.type===MultiSelectDropdown&&n.props.label==='Zones').props.quickSelection.onSelect();
   tree=h.render();let html=renderToStaticMarkup(tree);
-  assert.match(html,/data-metric="overview-inspections">—</);assert.match(html,/data-team-progress="SUPERVISOR">—</);
+  assert.match(html,/data-metric="overview-inspections">N\/A</);assert.match(html,/data-team-progress="SUPERVISOR">N\/A</);
   find(tree,n=>n.type===MultiSelectDropdown&&n.props.label==='Modules').props.onChange(['toilets']);
   tree=h.render();html=renderToStaticMarkup(tree);
   const panel=targetPanel(h);assert.match(panel,/data-target-progress="target">45</);assert.match(panel,/data-target-progress="received">14</);
@@ -240,6 +240,28 @@ test('Commissioner and ULB show 100% inspection baseline before configured targe
    tree=h.render(component,values);html=renderToStaticMarkup(tree);assert.match(targets(),/data-target-progress="full-target">225</);
    coverageHook.useInspectionCoverage=()=>({loading:false,data:{...data,inventoryAvailable:false}});
    tree=h.render(component,values);html=renderToStaticMarkup(tree);assert.doesNotMatch(targets(),/data-target-progress="full-target">0</);
+  }finally{h.close();}
+ }
+});
+
+
+test('Commissioner and ULB module coverage opens a page in the selected scope and returns to the dashboard',()=>{
+ const {CoveragePage}=require('../src/components/dashboard/CoveragePage.tsx');
+ for(const component of [CommissionerHome,UlbDashboard]){
+  const h=harness(),values={...props,currentUser:{id:'officer',role:component===UlbDashboard?'ULB_OFFICER':'COMMISSIONER'},onInspectZone:()=>{},onNoticeHandled:()=>{}};
+  try{
+   let tree=h.render(component,values);
+   find(tree,n=>n.type===MultiSelectDropdown&&n.props.label==='Zones').props.quickSelection.onSelect();
+   tree=h.render(component,values);find(tree,n=>n.type===ModuleDelivery).props.onCoverage({module:'sweeping'});
+   tree=h.render(component,values);assert.equal(tree.type,CoveragePage);assert.deepEqual(tree.props.scope,{module:'sweeping'});
+   assert.ok(tree.props.data.visits.every(v=>!['extra','outside'].includes(v.wardId)));
+   const html=renderToStaticMarkup(tree);assert.match(html,/Sweeping coverage/);assert.match(html,/Back to dashboard/);assert.doesNotMatch(html,/>Draft</);
+   tree.props.onBack();tree=h.render(component,values);assert.ok(find(tree,n=>n.type===ModuleDelivery));
+   assert.equal(find(tree,n=>n.type===MultiSelectDropdown&&n.props.label==='Zones').props.quickSelection.active,true);
+   find(tree,n=>n.type===ModuleDelivery).props.onCoverage({module:'sweeping'});
+   tree=h.render(component,values);tree.props.onOpen({module:'sweeping'},'inspections_completed');
+   tree=h.render(component,values);assert.notEqual(tree.type,CoveragePage);
+   if(component===UlbDashboard){const drawer=find(tree,n=>n.type===Drawer&&n.props.isOpen);assert.ok(drawer);assert.match(drawer.props.title,/submitted inspections/);}
   }finally{h.close();}
  }
 });

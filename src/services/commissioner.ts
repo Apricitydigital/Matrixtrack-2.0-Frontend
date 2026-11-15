@@ -1,3 +1,4 @@
+import { expireOperationalReads } from './readCache';
 import { concurrentReads } from './concurrentReads';
 import { inspectionOutcomes, selectInspectionModules } from './inspectionCoverage';
 import { inspectionMetrics } from './inspectionMetrics';
@@ -84,8 +85,9 @@ export function useCityPulse(cityId:string,from:string,to:string,zoneIds:string[
   const [refreshing,setRefreshing]=useState(false);
   const liveRevision=useOperationalRefresh(cityId,pulse.pending===0&&!refreshing);
   const scopeKey=JSON.stringify([cityId,from,to,zoneKey,wardKey,geoZoneKey,revision,topicKey]);
-  const loadedKey=useRef('');
+  const loadedKey=useRef(''),previousRevision=useRef(revision);
   useEffect(()=>{
+    if(previousRevision.current!==revision){expireOperationalReads();previousRevision.current=revision;}
     const c=new AbortController(),background=loadedKey.current===scopeKey,step=background?0:1;if(!background)setPulse({scopeKey,pending:6,errors:{}});
     setRefreshing(true);
     const {range,geo,official}=cityPulseQueries(from,to,zoneIds,wardId,geoZoneIds);
@@ -99,7 +101,7 @@ export function useCityPulse(cityId:string,from:string,to:string,zoneIds:string[
         const q=new URLSearchParams({startDate:new Date(`${from}T00:00:00+05:30`).toISOString(),endDate:new Date(`${to}T23:59:59.999+05:30`).toISOString(),tzOffset:'-330',view:'score'});
         const roles=[['SUPERVISOR','daroga'],['QC','si'],['ACTION_OFFICER','iec']];
         const results=await concurrentReads(roles.map(([role,key])=>async()=>{
-          const response=await api(`/city/users/${key}-performance?${q}`,{signal:c.signal,cache:'no-store'}),users=response?.users;
+          const response=await api(`/city/users/${key}-performance?${q}`,{signal:c.signal}),users=response?.users;
           if(!users||typeof users!=='object'||Array.isArray(users))throw Error('Performance response is incomplete.');
           if(!c.signal.aborted)setPulse(p=>({...p,performance:{...p.performance,[role]:users},errors:{...Object.fromEntries(Object.entries(p.errors).filter(([topic])=>topic!==`performance:${role}`)),...(Object.keys(response.errors||{}).length?{[`performance:${role}`]:'Some officer calculations are unavailable.'}:{})},...(role==='SUPERVISOR'&&p.official?{official:applyPerformanceTargets(p.official,users,wardId)}:{})}));
           return [role,users] as const;

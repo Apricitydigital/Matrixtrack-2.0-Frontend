@@ -40,6 +40,7 @@ test('pending locations are registered assets without an inspection, matching co
  assert.deepEqual(pending.map(a=>a.id),['a1','a2','a4']);assert.equal(pending.length,coverageCounts(data).remaining);
  assert.deepEqual(pendingLocations(data,{ward:'w2'}).map(a=>a.id),['a4']);
  assert.deepEqual(pendingLocations(data,{module:'toilets'}),[]);
+ assert.deepEqual(pendingLocations({...data,visits:[...data.visits,visit('draft',{asset:'a1',status:'DRAFT'})]}).map(a=>a.id),['a1','a2','a4']);
 });
 
 test('AI analysis reports agreement only where an SI decision and a clear AI result both exist',()=>{
@@ -92,4 +93,39 @@ test('cleanliness insights and the module AI strip render from the same register
  assert.match(summary,/data-metric="summary-cleaned">1</);assert.match(summary,/data-metric="summary-not-cleaned">0</);assert.match(summary,/50% clean/);
  const card=renderToStaticMarkup(React.createElement(ModuleDelivery,{modules:['sweeping'],pulse:{pending:0,errors:{}},data,loading:false,zone:'',ward:'',onInspect:()=>{}}));
  assert.match(card,/data-module-ai="sweeping"/);assert.match(card,/data-metric="pending-locations">1</);assert.match(card,/Beat 1/);assert.doesNotMatch(card,/inspection-card-details/);
+});
+
+
+test('cleanliness dashboard shows only the five worst assessed wards',()=>{
+ const {CleanlinessInsights}=require('../src/components/dashboard/CleanlinessInsights.tsx');
+ const wards=Array.from({length:8},(_,i)=>({id:`w${i}`,name:`Area ${i}`,zoneId:'z1'}));
+ const visits=wards.flatMap((w,i)=>Array.from({length:10},(_,j)=>visit(`${w.id}-${j}`,{ward:w.id,qc:j<i?'APPROVED':'REJECTED'})));
+ const data={...emptyCoverage(),visits,inventoryAvailable:true,modules:['sweeping']};
+ const html=renderToStaticMarkup(React.createElement(CleanlinessInsights,{data,loading:false,modules:['sweeping'],zones:[{id:'z1',name:'Zone 1'}],wards}));
+ assert.match(html,/Worst 5 wards/);assert.equal((html.match(/<button[^>]*data-band=/g)||[]).length,5);
+ for(let i=0;i<5;i++)assert.match(html,new RegExp(`Area ${i}`));
+ for(let i=5;i<8;i++)assert.doesNotMatch(html,new RegExp(`Area ${i}`));
+ assert.doesNotMatch(html,/All 8 wards|>Draft</);
+});
+
+test('single-pass cleanliness breakdown retains deduplication, SI priority and every group total',()=>{
+ const {cleanlinessOverview}=require('../src/services/cleanliness.ts');
+ const visits=[visit('a',{qc:'APPROVED',outcome:'NOT_CLEAN'}),visit('a',{qc:'APPROVED',outcome:'NOT_CLEAN'}),visit('b',{ward:'w2',outcome:'NOT_CLEAN'}),visit('c',{module:'toilets',zone:'z2',ward:'w3'})];
+ const overview=cleanlinessOverview(visits);assert.deepEqual(overview.total,cleanlinessStats(visits));
+ for(const key of ['module','zoneId','wardId'])assert.deepEqual(overview[key],cleanlinessBy(visits,key));
+});
+
+test('dashboard formats missing figures as N/A and preserves real zeroes',()=>{
+ const {fmtNum,fmtPct}=require('../src/components/dashboard/DetailPanel.tsx');
+ const {coverageNumber}=require('../src/pages/commissioner/CoverageOverview.tsx');
+ for(const value of [null,undefined]){assert.equal(fmtNum(value),'N/A');assert.equal(fmtPct(value),'N/A');assert.equal(coverageNumber(value),'N/A');}
+ assert.equal(fmtNum(0),'0');assert.equal(fmtPct(0),'0%');assert.equal(coverageNumber(0),'0');
+});
+
+test('coverage details exclude unsubmitted records from inspected and pending-location counts',()=>{
+ const {CoverageDetail}=require('../src/components/dashboard/panelBodies.tsx');
+ const assets=['a','b'].map(id=>({id,module:'sweeping',zoneId:'z1',wardId:'w1',name:`Beat ${id}`}));
+ const data={...emptyCoverage(),inventoryAvailable:true,modules:['sweeping'],assets,visits:[visit('1',{asset:'a'}),visit('2',{asset:'b',status:'DRAFT'})]};
+ const html=renderToStaticMarkup(React.createElement(CoverageDetail,{data,modules:['sweeping'],zones:[],wards:[]}));
+ assert.match(html,/50%/);assert.match(html,/Beat b/);assert.doesNotMatch(html,/Beat a|>Draft</);
 });

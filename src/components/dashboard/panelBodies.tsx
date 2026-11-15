@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { InspectionCoverage } from '../../services/inspectionCoverage';
+import { inspectionStatus } from '../../services/inspectionStatus';
 import { coverageCounts } from '../../services/inspectionCoverage';
 import { aiAnalysis, cleanlinessStats, notCleanLocations, pendingLocations, type CleanStats } from '../../services/cleanliness';
 import { MODULE_LABELS } from '../../services/presentation';
@@ -57,6 +58,7 @@ export function PendingList({ data, scope, wards, limit = 25 }: { data: Inspecti
 
 /** Coverage for a scope: registered, inspected, not yet inspected, outside the register; by module and zone; pending list. */
 export function CoverageDetail({ data, modules, zones, wards, scope = {}, onOpen }: { data: InspectionCoverage; modules: OperationalModuleId[]; zones: Named[]; wards: Named[]; scope?: Scope; onOpen?: OpenReports }) {
+  data=useMemo(()=>({...data,visits:data.visits.filter(v=>inspectionStatus(v.status||'SUBMITTED')!=='unclassified')}),[data]);
   const c = coverageCounts(data, scope as any);
   const row = (label: string, s: Scope) => { const k = coverageCounts(data, s as any); return [label, fmtNum(k.total), fmtNum(k.covered), fmtNum(k.remaining), fmtPct(k.percent)]; };
   return <>

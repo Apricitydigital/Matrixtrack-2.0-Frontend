@@ -53,5 +53,5 @@ export function PanelTable({ head, rows, empty = 'Nothing to show for this selec
   return <div className="dp-table"><table><thead><tr>{head.map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{rows.map(r => <tr key={r.key} data-click={Boolean(r.onClick)} onClick={r.onClick} tabIndex={r.onClick ? 0 : undefined} onKeyDown={r.onClick ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); r.onClick!(); } } : undefined}>{r.cells.map((c, i) => <td key={i}>{c}</td>)}</tr>)}</tbody></table></div>;
 }
 export const CLEAN_COLORS = { clean: '#0ca30c', notClean: '#d03b3b', unassessed: '#a9b6c0', inspected: '#2a78d6', pending: '#eda100' };
-export const fmtNum = (n: number | null | undefined, d = 0) => n == null || !Number.isFinite(n) ? '—' : n.toLocaleString('en-IN', { maximumFractionDigits: d });
-export const fmtPct = (n: number | null | undefined) => n == null || !Number.isFinite(n) ? '—' : `${n.toLocaleString('en-IN', { maximumFractionDigits: 1 })}%`;
+export const fmtNum = (n: number | null | undefined, d = 0) => n == null || !Number.isFinite(n) ? 'N/A' : n.toLocaleString('en-IN', { maximumFractionDigits: d });
+export const fmtPct = (n: number | null | undefined) => n == null || !Number.isFinite(n) ? 'N/A' : `${n.toLocaleString('en-IN', { maximumFractionDigits: 1 })}%`;

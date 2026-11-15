@@ -182,12 +182,14 @@ test('inspection register reconciles the overview and keeps SI queues distinct f
  const data=registerInsightData(rows,['sweeping']);
  assert.equal(data.statuses.reduce((n,s)=>n+s.value,0),1258);
  assert.equal(data.statuses.find(s=>s.id==='approved').label,'Cleaned');
- assert.equal(data.statuses.find(s=>s.id==='unclassified').label,'Draft');
- assert.equal(data.queues[0].value,1047);
+ assert.equal(data.statuses.some(s=>s.id==='unclassified'),false);
+ assert.equal(data.statuses.find(s=>s.id==='pending_review').value,1153);
+ assert.equal(data.queues[0].value,1153);
+ assert.equal(rows.filter(r=>matchesFilters(r,{...emptyFilters(),status:'pending_review'},[])).length,1153);
  assert.equal(rows.filter(r=>matchesFilters(r,{...emptyFilters(),status:'inspections_completed'},[])).length,1152);
  const taken={id:'taken',moduleId:'sweeping',status:'action_taken',actionRequired:true};
  const lifecycle=registerInsightData([...rows,taken],['sweeping']);
- assert.equal(lifecycle.queues[0].value,1047);
+ assert.equal(lifecycle.queues[0].value,1153);
  assert.equal(lifecycle.statuses.find(s=>s.id==='action_taken').value,1);
  assert.equal(matchesFilters(taken,{...emptyFilters(),status:'all_actions_required'},[]),true);
  assert.equal(matchesFilters(taken,{...emptyFilters(),status:'pending_review'},[]),false);
@@ -1836,8 +1838,8 @@ test('Commissioner inspection statuses reconcile every report including correcti
   const data = { ...emptyCoverage(), inventoryAvailable: true, modules: ['sweeping'], visits: Array.from({ length: 220 }, (_, i) => ({ id: String(i), module: 'sweeping', assetId: String(i), zoneId: 'z', wardId: 'w', status: i < 11 ? 'APPROVED' : i < 190 ? 'SUBMITTED' : i < 200 ? 'ACTION_REQUIRED' : i < 210 ? 'ACTION_TAKEN' : i < 219 ? 'ESCALATED' : 'NEW_BACKEND_STATUS' })) };
   const outcomes = inspectionOutcomes(data);
   assert.equal(outcomes.total, 220); assert.equal(outcomes.rows.reduce((n, r) => n + r.value, 0), coverageCounts(data).inspections);
-  assert.equal(outcomes.rows.find(r => r.id === 'pending_review').value, 179);
-  assert.equal(outcomes.rows.find(r => r.id === 'unclassified').value, 1);
+  assert.equal(outcomes.rows.find(r => r.id === 'pending_review').value, 180);
+  assert.equal(outcomes.rows.some(r => r.id === 'unclassified'), false);
   const failed = inspectionOutcomes({ ...data, failedModules: ['sweeping'] }); assert.equal(failed.total, null); assert.ok(failed.rows.every(r => r.value === null));
   assert.equal(inspectionOutcomes(data, { ward: 'other' }).total, 0);
 });
@@ -2078,7 +2080,7 @@ test('Super Admin progress uses the Commissioner metrics for single-day, seven-d
   for(const [from,days] of [['2026-11-02',1],['2026-10-27',7],['2026-08-01',94]]){
    range={from,to:'2026-11-02'};const html=render();
    assert.equal(number(html,'Inspection target'),String(3*days));
-   assert.equal(number(html,'Inspections completed'),'2');assert.equal(number(html,'Pending review'),'1');assert.match(html,/3 total inspection records/);
+   assert.equal(number(html,'Inspections completed'),'2');assert.equal(number(html,'Pending review'),'2');assert.doesNotMatch(html,/>Draft</);assert.match(html,/3 total inspection records/);
   }
   configured=true;assert.equal(number(render(),'Inspection target'),'1,574');
   loading=true;assert.equal(number(render(),'Inspection target'),'Loading…');
@@ -2246,14 +2248,15 @@ test('audit export fetches every attendance page and refuses missing, repeating 
 });
 
 
-test('ULB excludes Draft from pending decisions and from registered-entity coverage',()=>{
+test('ULB groups unsubmitted records under Pending review while excluding them from completed coverage',()=>{
  const {ulbScopeData}=require('../src/services/ulbDashboard.ts');const {emptyCoverage}=require('../src/services/inspectionCoverage.ts');
  const data={...emptyCoverage(),inventoryAvailable:true,assets:[{id:'one',module:'sweeping',zoneId:'z',wardId:'w'},{id:'two',module:'sweeping',zoneId:'z',wardId:'w'}],visits:[{id:'draft',module:'sweeping',assetId:'two',zoneId:'z',wardId:'w',status:'DRAFT'},{id:'pending',module:'sweeping',assetId:'one',zoneId:'z',wardId:'w',status:'SUBMITTED'}]};
- const result=ulbScopeData(data);assert.equal(result.counts.inspections,2);assert.equal(result.statusCount('pending_review'),1);assert.equal(result.statusCount('unclassified'),1);assert.equal(result.completedCounts.inspections,1);assert.equal(result.completedCounts.covered,1);assert.equal(result.notInspected[0].id,'two');
+ const result=ulbScopeData(data);assert.equal(result.counts.inspections,2);assert.equal(result.statusCount('pending_review'),2);assert.equal(result.statusCount('unclassified'),0);
+ const {ulbDrillVisits}=require('../src/services/ulbDashboard.ts');assert.equal(ulbDrillVisits(result,'pending_review').length,2);assert.equal(result.completedCounts.inspections,1);assert.equal(result.completedCounts.covered,1);assert.equal(result.notInspected[0].id,'two');
 });
 
-test('ward export explains no recorded reports, Draft-only and completed-but-unassessed states separately',()=>{
- const {wardRecordReason}=require('../src/services/wardAvailability.ts');assert.match(wardRecordReason(null,null,null),/Do not infer zero/);assert.match(wardRecordReason(0,0,0),/no recorded report/);assert.match(wardRecordReason(2,0,2),/Draft/);assert.match(wardRecordReason(2,1,1),/scoring eligibility/);
+test('ward export explains no recorded reports, unsubmitted-only and completed-but-unassessed states separately',()=>{
+ const {wardRecordReason}=require('../src/services/wardAvailability.ts');assert.match(wardRecordReason(null,null,null),/Do not infer zero/);assert.match(wardRecordReason(0,0,0),/no recorded report/);assert.match(wardRecordReason(2,0,2),/2 reports not yet submitted/);assert.doesNotMatch(wardRecordReason(2,0,2),/Draft/);assert.match(wardRecordReason(2,1,1),/scoring eligibility/);
 });
 
 test('target loading never presents an unverified planning fallback as the configured result',()=>{const {targetDelivery,targetReadState}=require('../src/services/targetDelivery.ts');const fallback=targetDelivery(undefined,{total:15,required:15,dailyCovered:4,unique:4});assert.equal(fallback.percent,4/15*100);assert.equal(targetReadState(fallback,false).percent,null);const configured=targetDelivery({target:17,completed:1,targetState:'configured'});assert.equal(targetReadState(configured,true).target,17);assert.equal(targetReadState(configured,true).completed,1);});

@@ -26,7 +26,7 @@ export function OperationalFilters({ value, onChange, zones = [], wards = [], us
     <button type="button" className="ops-reset" onClick={() => {setExpanded(false);onChange(emptyFilters());}}><RotateCcw size={14} />Reset filters</button>
   </div>{expanded&&<div id={`${id}-advanced`} className="ops-advanced-grid">
     {(staffOptions?.length||users.length)>0 && select('Staff', 'staffId', staffOptions || [...new Map(users.map(u => [u.id, u])).values()].map(u => [u.id, `${u.name} · ${ROLE_LABELS[u.role] || u.role}`]))}
-    {!!statuses.length && select('Statuses', 'status', [...statuses.map(s => [s, statusLabels[s] || statusLabel(s)] as [string,string]),...Object.entries(INTELLIGENCE_LABELS).map(([key,label])=>[intelligenceFilter(key),label] as [string,string])])}
+    {!!statuses.length && select('Statuses', 'status', [...statuses.filter(s=>s!=='unclassified'||!statuses.includes('pending_review')).map(s => [s, statusLabels[s] || statusLabel(s)] as [string,string]),...Object.entries(INTELLIGENCE_LABELS).map(([key,label])=>[intelligenceFilter(key),label] as [string,string])])}
     {select('RYG statuses', 'ryg', Object.entries(RYG_LABELS))}
   </div>}</section>;
 }

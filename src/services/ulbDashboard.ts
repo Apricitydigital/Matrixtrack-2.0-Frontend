@@ -1,3 +1,4 @@
+import { inspectionDisplayStatus } from './inspectionStatus';
 import { actionLifecycle } from './actionLifecycle';
 import type {InspectionCoverage,InspectionVisit} from './inspectionCoverage';
 import {coverageCounts,inspectionStatus} from './inspectionCoverage';
@@ -21,7 +22,7 @@ export function ulbScopeData(data:InspectionCoverage,scope:UlbScope={}){
   const completedVisits=visits.filter(v=>ulbVisitStatus(v)!=='unclassified');
   const completedCounts=coverageCounts({...data,visits:data.visits.filter(v=>ulbVisitStatus(v)!=='unclassified')},scope);
   const known=counts.inspections!=null;
-  const statusCount=(status:string)=>known?visits.filter(v=>ulbVisitStatus(v)===status).length:null;
+  const statusCount=(status:string)=>known?visits.filter(v=>inspectionDisplayStatus(v.status)===status).length:null;
   const seen=new Set<string>(),repeatIds=new Set<string>();
   // Keep the first recorded visit for each module/location; every later visit is a repeat.
   for(const v of [...completedVisits].sort((a,b)=>(a.submittedAt||'').localeCompare(b.submittedAt||'')||a.id.localeCompare(b.id))){if(!v.assetId)continue;const key=`${v.module}:${v.assetId}`;if(seen.has(key))repeatIds.add(v.id);else seen.add(key);}
@@ -38,5 +39,5 @@ export function ulbDrillVisits(data:ReturnType<typeof ulbScopeData>,kind:UlbDril
   if(kind==='action_required')return data.visits.filter(ulbActionWasRequired);
   if(kind==='action_taken')return data.visits.filter(v=>actionLifecycle(v).taken);
   if(kind==='action_pending')return data.visits.filter(v=>ulbVisitStatus(v)==='action_required');
-  return data.visits.filter(v=>ulbVisitStatus(v)===kind);
+  return data.visits.filter(v=>kind==='unclassified'?ulbVisitStatus(v)===kind:inspectionDisplayStatus(v.status)===kind);
 }

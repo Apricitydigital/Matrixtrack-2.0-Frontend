@@ -23,11 +23,11 @@ export function AdviceDetail({ advice, onNavigate }: { advice: OfficerAdvice; on
 
 interface Props {
   data: InspectionCoverage; loading: boolean; performance?: Record<string, Record<string, any> | undefined>;
-  users: any[]; wards: { id: string; name: string; zoneId: string }[]; zoneIds: string[]; wardIds: string[]; onNavigate?: () => void;
+  users: any[]; wards: { id: string; name: string; zoneId: string }[]; zoneIds: string[]; wardIds: string[]; onNavigate?: () => void; advice?: OfficerAdvice[];
 }
-export function useOfficerAdvice({ data, performance, users, wards, zoneIds, wardIds }: Omit<Props, 'loading' | 'onNavigate'>, roles?: AdviceRole[]) {
-  return useMemo(() => officerAdvice({ visits: data.visits, assets: data.assets, users, wards, zoneIds, wardIds, from: data.from, to: data.to }, roles, performance || {}),
-    [data, performance, users, wards, zoneIds.join(), wardIds.join(), roles?.join()]);
+export function useOfficerAdvice({ data, performance, users, wards, zoneIds, wardIds, advice }: Omit<Props, 'loading' | 'onNavigate'>, roles?: AdviceRole[]) {
+  return useMemo(() => advice ?? officerAdvice({ visits: data.visits, assets: data.assets, users, wards, zoneIds, wardIds, from: data.from, to: data.to }, roles, performance || {}),
+    [advice, data, performance, users, wards, zoneIds.join(), wardIds.join(), roles?.join()]);
 }
 
 /** Officers whose recorded evidence shows weak performance, with concrete ways to improve. */
@@ -47,11 +47,11 @@ export function IntelligenceSuggestions(props: Props) {
     <div className="ai-tabs" role="tablist">{(['ALL', 'SUPERVISOR', 'QC', 'ACTION_OFFICER'] as const).map(r => <button key={r} type="button" role="tab" aria-selected={role === r} onClick={() => setRole(r)}>{r === 'ALL' ? 'All officers' : ROLE_LABELS[r] || r}<b>{counts[r]}</b></button>)}</div>
     {waiting && !all.length ? <p className="di-empty">Preparing suggestions…</p>
       : shown.length ? <div className="ai-grid">{shown.slice(0, 6).map(a => <button key={`${a.role}:${a.id}`} type="button" className="ai-card" data-severity={a.severity} onClick={() => open(a)}>
-        <header><span className="ai-avatar">{a.name.split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase()}</span><div><strong>{a.name}</strong><small>{ROLE_LABELS[a.role] || a.role} · {SEVERITY[a.severity]}</small></div><b>{a.score == null ? '—' : `${Math.round(a.score)}%`}</b></header>
+        <header><span className="ai-avatar">{a.name.split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase()}</span><div><strong>{a.name}</strong><small>{ROLE_LABELS[a.role] || a.role} · {SEVERITY[a.severity]}</small></div><b>{a.score == null ? 'N/A' : `${Math.round(a.score)}%`}</b></header>
         <ul>{a.suggestions.slice(0, 2).map(s => <li key={s.title}><strong>{s.title}</strong><span>{s.detail}</span></li>)}</ul>
         <footer>{a.suggestions.length > 2 ? `+${a.suggestions.length - 2} more suggestions` : 'View details'}<ArrowUpRight size={13} /></footer>
       </button>)}</div>
         : <div className="ai-ok"><CheckCircle2 size={18} />{all.length ? 'No officer in this selection needs improvement on the recorded evidence.' : 'No officer performance is recorded for this selection.'}</div>}
-    {shown.length > 6 && <button type="button" className="ai-all" onClick={() => panel?.open({ title: 'Intelligence suggestions', subtitle: `${shown.length} officers need support`, width: '3xl', body: <div className="ai-panel-list">{shown.map(a => <button key={`${a.role}:${a.id}`} type="button" data-severity={a.severity} onClick={() => open(a)}><span><strong>{a.name}</strong><small>{ROLE_LABELS[a.role] || a.role} · {a.suggestions[0]?.title}</small></span><b>{a.score == null ? '—' : `${Math.round(a.score)}%`}</b><ArrowUpRight size={14} /></button>)}</div> })}>View all {shown.length} officers<ArrowUpRight size={14} /></button>}
+    {shown.length > 6 && <button type="button" className="ai-all" onClick={() => panel?.open({ title: 'Intelligence suggestions', subtitle: `${shown.length} officers need support`, width: '3xl', body: <div className="ai-panel-list">{shown.map(a => <button key={`${a.role}:${a.id}`} type="button" data-severity={a.severity} onClick={() => open(a)}><span><strong>{a.name}</strong><small>{ROLE_LABELS[a.role] || a.role} · {a.suggestions[0]?.title}</small></span><b>{a.score == null ? 'N/A' : `${Math.round(a.score)}%`}</b><ArrowUpRight size={14} /></button>)}</div> })}>View all {shown.length} officers<ArrowUpRight size={14} /></button>}
   </section>;
 }

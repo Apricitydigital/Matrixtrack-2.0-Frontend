@@ -14,14 +14,14 @@ import type { Zone } from '../../types';
 import { usePanel } from '../../components/dashboard/DetailPanel';
 import { AssetCoverageStats, CoverageDetail, type OpenReports } from '../../components/dashboard/panelBodies';
 
-export const coverageNumber=(n:number|null|undefined)=>n==null?'—':n.toLocaleString('en-IN',{maximumFractionDigits:1});
+export const coverageNumber=(n:number|null|undefined)=>n==null?'N/A':n.toLocaleString('en-IN',{maximumFractionDigits:1});
 
-export function CoverageOverview({data,loading,zone,ward,zones,rankings,official,from,to,onZone,scopeLabel,targetsReady=true,wards=[],onOpen}:{wards?:{id:string;name:string;zoneId?:string}[];onOpen?:OpenReports;data:InspectionCoverage;loading:boolean;zone:string;ward:string;zones:Zone[];rankings:any[];official?:CityPulse['official'];from:string;to:string;onZone:(id:string)=>void;scopeLabel?:string;targetsReady?:boolean}) {
+export function CoverageOverview({data,loading,zone,ward,zones,rankings,official,from,to,onZone,scopeLabel,targetsReady=true,wards=[],onOpen,onCoverage}:{onCoverage?:(scope:{module?:string;zone?:string;ward?:string})=>void;wards?:{id:string;name:string;zoneId?:string}[];onOpen?:OpenReports;data:InspectionCoverage;loading:boolean;zone:string;ward:string;zones:Zone[];rankings:any[];official?:CityPulse['official'];from:string;to:string;onZone:(id:string)=>void;scopeLabel?:string;targetsReady?:boolean}) {
   const metrics=inspectionMetrics(data,{zone,ward},official?.totals),counts=metrics.completed;
   const rows=zoneCoverage(data,zones.filter(z=>!zone||z.id===zone),rankings,ward).map(row=>({...row,...inspectionMetrics(data,{zone:row.id,ward}).completed}));
   const number=(n:number|null)=>loading?'…':coverageNumber(n);
   const panel=usePanel();
-  const details=()=>panel?.open({title:'City coverage',subtitle:`${scopeLabel||(zone?'Selected zone':'All zones')} · registered locations inspected in the selected dates`,width:'3xl',body:<CoverageDetail data={data} modules={data.modules} zones={zones.filter(z=>!zone||z.id===zone)} wards={wards} scope={{zone:zone||undefined,ward:ward||undefined}} onOpen={onOpen}/>});
+  const details=()=>onCoverage?onCoverage({zone:zone||undefined,ward:ward||undefined}):panel?.open({title:'City coverage',subtitle:`${scopeLabel||(zone?'Selected zone':'All zones')} · registered locations inspected in the selected dates`,width:'3xl',body:<CoverageDetail data={data} modules={data.modules} zones={zones.filter(z=>!zone||z.id===zone)} wards={wards} scope={{zone:zone||undefined,ward:ward||undefined}} onOpen={onOpen}/>});
   const delivery=metrics.delivery;
   const period=(value:string)=>new Date(value+'T12:00:00Z').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Kolkata'});
   return <>
@@ -39,7 +39,7 @@ export function CoverageOverview({data,loading,zone,ward,zones,rankings,official
         const source=official?.zones?.find(z=>z.id===row.id),target=reportTargetDelivery(targetReadState(targetDelivery(source?.totals,row),targetsReady),row.inspections);
         return <tr key={row.id}><td data-label="Zone"><button className="zone-select" onClick={()=>onZone(row.id)}><strong>{row.name}</strong><ArrowUpRight size={15}/></button></td>
           <td data-label="Inspection target achievement"><small className="delivery-caption">{'Reports received / target'}</small><div className="delivery-target"><div><strong>{target.available?coverageNumber(target.completed):target.stateLabel}{target.available&&<small> / {coverageNumber(target.target)}</small>}</strong><span className={target.met?'delivery-met':'delivery-progress'}>{target.available?(target.percent!=null?`${coverageNumber(target.percent)}%`:'\u2014'):target.stateLabel}</span></div>{target.available&&<div className="delivery-meter"><i data-met={target.met} style={{width:`${Math.min(100,target.percent??0)}%`}}/></div>}</div></td>
-          <td data-label={terms.pending}><strong className="delivery-count">{target.available?coverageNumber(target.remaining):'—'}</strong><small className="delivery-caption">{!target.available?target.stateLabel:target.met?'Requirement met':target.fallback?'to meet inspection target':'to meet target'}</small></td>
+          <td data-label={terms.pending}><strong className="delivery-count">{target.available?coverageNumber(target.remaining):'N/A'}</strong><small className="delivery-caption">{!target.available?target.stateLabel:target.met?'Requirement met':target.fallback?'to meet inspection target':'to meet target'}</small></td>
           <td data-label={terms.coverage}><strong className="delivery-count">{number(row.covered)}<small> / {number(row.total)}</small></strong><small className="delivery-caption">{row.percent==null?'Coverage unavailable':`${coverageNumber(row.percent)}% of registered locations`}</small></td>
           <td data-label="Pending review"><span className="zone-pending">{number(inspectionOutcomes(data,{zone:row.id,ward}).rows.find(r=>r.id==='pending_review')?.value??null)}</span></td>
           {(()=>{const o=inspectionOutcomes(data,{zone:row.id,ward}),val=(id:string)=>o.rows.find(r=>r.id===id)?.value??null,ai=scopedIntelligence(data,{zone:row.id,ward},o.total!=null);return <>

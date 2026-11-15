@@ -50,6 +50,19 @@ export function cleanlinessStats(visits: InspectionVisit[]): CleanStats {
   return finish(s);
 }
 
+/** Classify each inspection once for the four dashboard breakdowns. */
+export function cleanlinessOverview(visits: InspectionVisit[]) {
+  const total=empty(), module=new Map<string,CleanStats>(), zoneId=new Map<string,CleanStats>(), wardId=new Map<string,CleanStats>();
+  const groups={module,zoneId,wardId};
+  for(const v of unique(visits)) {
+    const result=visitCleanliness(v),targets=[total];
+    for(const key of ['module','zoneId','wardId'] as const){const id=v[key];if(!id)continue;let s=groups[key].get(id);if(!s){s=empty();groups[key].set(id,s);}targets.push(s);}
+    for(const s of targets){s.inspections++;if(result.verdict==='clean'){s.clean++;if(result.source==='si')s.siClean++;else s.aiClean++;}else if(result.verdict==='not_clean'){s.notClean++;if(result.source==='si')s.siNotClean++;else s.aiNotClean++;}else s.unassessed++;}
+  }
+  finish(total);for(const group of Object.values(groups))for(const s of group.values())finish(s);
+  return {total,...groups};
+}
+
 /** Cleanliness grouped by module, zone or ward. Records without the grouping field are skipped. */
 export function cleanlinessBy(visits: InspectionVisit[], key: 'module' | 'zoneId' | 'wardId'): Map<string, CleanStats> {
   const groups = new Map<string, InspectionVisit[]>();
@@ -76,7 +89,7 @@ export function notCleanLocations(data: Pick<InspectionCoverage, 'assets' | 'vis
 /** Registered locations with no inspection in the selected dates (the coverage "remaining" set). */
 export function pendingLocations(data: Pick<InspectionCoverage, 'assets' | 'visits'>, scope: { module?: string; zone?: string; ward?: string } = {}): MapAsset[] {
   const match = (r: { module: string; zoneId: string; wardId: string }) => (!scope.module || r.module === scope.module) && (!scope.zone || r.zoneId === scope.zone) && (!scope.ward || r.wardId === scope.ward);
-  const visited = new Set(data.visits.filter(match).filter(v => v.assetId).map(v => `${v.module}:${v.assetId}`));
+  const visited = new Set(data.visits.filter(match).filter(v => v.assetId && inspectionStatus(v.status || 'SUBMITTED') !== 'unclassified').map(v => `${v.module}:${v.assetId}`));
   return data.assets.filter(match).filter(a => !visited.has(`${a.module}:${a.id}`))
     .sort((a, b) => (a.wardName || '').localeCompare(b.wardName || '', undefined, { numeric: true }) || (a.name || '').localeCompare(b.name || '', undefined, { numeric: true }));
 }

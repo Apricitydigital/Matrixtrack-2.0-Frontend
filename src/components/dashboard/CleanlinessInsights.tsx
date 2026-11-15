@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
 import { ArrowUpRight, Sparkles, Sprout } from 'lucide-react';
 import type { InspectionCoverage } from '../../services/inspectionCoverage';
-import { cleanlinessBy, cleanlinessStats, type CleanStats } from '../../services/cleanliness';
+import { cleanlinessOverview, cleanlinessStats, type CleanStats } from '../../services/cleanliness';
 import { MODULE_LABELS } from '../../services/presentation';
 import type { OperationalModuleId } from '../../types';
 import { CardInfo } from '../common/CardInfo';
-import { CLEAN_COLORS, PanelTable, fmtNum, fmtPct, usePanel } from './DetailPanel';
+import { CLEAN_COLORS, fmtNum, fmtPct, usePanel } from './DetailPanel';
 import { CleanlinessDetail, type OpenReports, type Scope } from './panelBodies';
 
 type Named = { id: string; name: string; zoneId?: string };
@@ -42,16 +42,11 @@ export function CleanedSummary({ data, loading, fallback, onSelect }: { data?: I
 
 export function CleanlinessInsights({ data, loading, modules, zones, wards, onOpen }: { data: InspectionCoverage; loading: boolean; modules: OperationalModuleId[]; zones: Named[]; wards: Named[]; onOpen?: OpenReports }) {
   const panel = usePanel();
-  const city = useMemo(() => cleanlinessStats(data.visits), [data]);
-  const byModule = useMemo(() => cleanlinessBy(data.visits, 'module'), [data]);
-  const byZone = useMemo(() => cleanlinessBy(data.visits, 'zoneId'), [data]);
-  const byWard = useMemo(() => cleanlinessBy(data.visits, 'wardId'), [data]);
+  const {total:city,module:byModule,zoneId:byZone,wardId:byWard}=useMemo(()=>cleanlinessOverview(data.visits),[data.visits]);
   const unavailable = !loading && (data.failedModules.length > 0);
   const wardRows = wards.map(w => ({ ward: w, stats: byWard.get(w.id) })).filter(r => r.stats && r.stats.clean + r.stats.notClean > 0)
     .sort((a, b) => (a.stats!.percent ?? 101) - (b.stats!.percent ?? 101) || b.stats!.notClean - a.stats!.notClean || a.ward.name.localeCompare(b.ward.name, undefined, { numeric: true }));
   const show = (title: string, subtitle: string, scope: Scope) => panel?.open({ title, subtitle, body: <CleanlinessDetail data={data} scope={scope} wards={wards} onOpen={onOpen} /> });
-  const showAllWards = () => panel?.open({ title: 'Ward-wise cleanliness', subtitle: `${wardRows.length} wards with assessed inspections · lowest first`, width: '3xl', body: <PanelTable head={['Ward', 'Zone', 'Inspections', 'Clean', 'Not clean', 'Cleanliness']}
-    rows={wardRows.map(({ ward, stats }) => ({ key: ward.id, onClick: () => show(ward.name, 'Ward cleanliness', { ward: ward.id }), cells: [ward.name, zones.find(z => z.id === ward.zoneId)?.name || '—', fmtNum(stats!.inspections), fmtNum(stats!.clean), fmtNum(stats!.notClean), <b data-band={band(stats!.percent)} className="di-pct">{fmtPct(stats!.percent)}</b>] }))} /> });
   const row = (id: string, label: string, s: CleanStats | undefined, scope: Scope) => <button key={id} type="button" className="di-row" disabled={loading || !s} onClick={() => s && show(label, scope.module ? 'Module cleanliness' : 'Zone cleanliness', scope)}>
     <span className="di-row-label">{label}</span>{s ? <Bar s={s} /> : <span className="di-bar" data-empty="true" />}<b data-band={band(s?.percent ?? null)}>{loading ? '…' : fmtPct(s?.percent)}</b>
   </button>;
@@ -74,8 +69,8 @@ export function CleanlinessInsights({ data, loading, modules, zones, wards, onOp
       <div className="di-col"><h3>By module</h3>{modules.map(m => row(m, MODULE_LABELS[m] || m, byModule.get(m), { module: m }))}</div>
       <div className="di-col"><h3>By zone</h3>{zones.length ? zones.map(z => row(z.id, z.name, byZone.get(z.id), { zone: z.id })) : <p className="di-empty">No zones in this selection.</p>}</div>
     </div>
-    <div className="di-wards"><div className="di-wards-head"><h3>By ward <small>lowest cleanliness first</small></h3>{wardRows.length > 0 && <button type="button" onClick={showAllWards} disabled={!panel}>All {wardRows.length} wards<ArrowUpRight size={13} /></button>}</div>
-      {loading ? <p className="di-empty">Loading…</p> : wardRows.length ? <div className="di-ward-grid">{wardRows.slice(0, 12).map(({ ward, stats }) => <button key={ward.id} type="button" data-band={band(stats!.percent)} onClick={() => show(ward.name, 'Ward cleanliness', { ward: ward.id })}>
+    <div className="di-wards"><div className="di-wards-head"><h3>Worst 5 wards <small>lowest cleanliness first</small></h3></div>
+      {loading ? <p className="di-empty">Loading…</p> : wardRows.length ? <div className="di-ward-grid">{wardRows.slice(0, 5).map(({ ward, stats }) => <button key={ward.id} type="button" data-band={band(stats!.percent)} onClick={() => show(ward.name, 'Ward cleanliness', { ward: ward.id })}>
         <span>{ward.name}</span><strong>{fmtPct(stats!.percent)}</strong><small>{fmtNum(stats!.notClean)} not clean · {fmtNum(stats!.inspections)} inspections</small></button>)}</div>
         : <p className="di-empty">No assessed inspections in this selection.</p>}
     </div>

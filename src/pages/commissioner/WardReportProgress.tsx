@@ -12,7 +12,7 @@ import {scopedIntelligence} from '../../services/intelligenceMetrics';
 import {heatStyle} from '../../components/analytics/VisualCharts';
 
 interface Props {data:InspectionCoverage;wards:Ward[];targetRows:any[];targetsReady:boolean;loading:boolean;onInspect:(ward:Ward,status?:string)=>void;}
-const count=(value:number|null)=>value==null?'\u2014':value.toLocaleString('en-IN',{maximumFractionDigits:1});
+const count=(value:number|null)=>value==null?'N/A':value.toLocaleString('en-IN',{maximumFractionDigits:1});
 
 export function WardReportProgress({data,wards,targetRows,targetsReady,loading,onInspect}:Props) {
   const paging=usePagination([...wards].sort(geographyOrder),JSON.stringify([data.from,data.to,wards.map(w=>w.id),data.modules]));
@@ -28,8 +28,8 @@ export function WardReportProgress({data,wards,targetRows,targetsReady,loading,o
       return <tr key={ward.id} data-ward-progress={ward.id}><td><button className="zone-select" onClick={()=>onInspect(ward)}>{ward.name}<ArrowUpRight size={13}/></button></td>
         <td data-ward-metric="assets">{number(metrics.totalEntities)}</td><td data-ward-metric="target">{number(delivery.target)}</td>
         <td data-ward-metric="received"><button disabled={loading||metrics.achieved==null} onClick={()=>onInspect(ward,'inspections_completed')}>{number(metrics.achieved)}</button></td>
-        <td data-ward-metric="remaining">{number(delivery.remaining)}</td><td data-ward-metric="progress" className={visual&&!loading?'viz-heat':undefined} style={visual&&!loading?heatStyle(delivery.percent):undefined}>{loading?'Updating':delivery.percent==null?'\u2014':`${count(delivery.percent)}%`}</td>
-        <td className={visual&&!loading?'viz-heat viz-heat-aqua':undefined} style={visual&&!loading?heatStyle(metrics.coveragePercent):undefined}>{loading?'Updating':metrics.coveragePercent==null?'\u2014':`${count(metrics.coveragePercent)}%`}</td>
+        <td data-ward-metric="remaining">{number(delivery.remaining)}</td><td data-ward-metric="progress" className={visual&&!loading?'viz-heat':undefined} style={visual&&!loading?heatStyle(delivery.percent):undefined}>{loading?'Updating':delivery.percent==null?'N/A':`${count(delivery.percent)}%`}</td>
+        <td className={visual&&!loading?'viz-heat viz-heat-aqua':undefined} style={visual&&!loading?heatStyle(metrics.coveragePercent):undefined}>{loading?'Updating':metrics.coveragePercent==null?'N/A':`${count(metrics.coveragePercent)}%`}</td>
         {['pending_review','approved','rejected'].map(id=><td key={id}><button disabled={loading||status(id)==null} onClick={()=>onInspect(ward,id)}>{number(status(id))}</button></td>)}
         {[['clean','intelligence_clean'],['notClean','intelligence_not_clean']].map(([k,f])=>{const v=ai?(ai as any)[k] as number:null;return <td key={f} data-ward-metric={f} title="AI suggestion on reports awaiting SI review; not an official decision"><button disabled={loading||v==null} onClick={()=>onInspect(ward,f)}>{number(v)}</button></td>;})}
       </tr>;
