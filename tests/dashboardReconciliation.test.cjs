@@ -139,7 +139,8 @@ test('top, zone and module report progress reconcile while scoring credit remain
  const {ModuleDelivery}=require('../src/pages/commissioner/ModuleDelivery.tsx');
  const html=renderToStaticMarkup(React.createElement(ModuleDelivery,{modules:['sweeping','toilets'],pulse:{official,errors:{},pending:0},data,loading:false,zone:'',ward:'',onInspect:()=>{}}));
  assert.match(html,/data-metric="achievement" data-met="false">20%/);assert.match(html,/data-metric="achievement" data-met="false">30%/);
- assert.match(html,/Daroga scoring credit/);assert.match(html,/data-metric="pending">16/);assert.match(html,/data-metric="pending">7/);
+ // Scoring credit and reports still needed moved from the card into the module detail panel.
+ assert.doesNotMatch(html,/inspection-card-details|Daroga scoring credit/);
 });
 test('module selection narrows target rows along with geography; exports retain the same percentage',()=>{
  const scoped=applyPerformanceTargets(ulbInspectionSummary(raw,zones,['w1','w2']),users,['w1','w2'],['toilets']);

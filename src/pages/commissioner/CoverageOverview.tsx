@@ -11,18 +11,23 @@ import type { CityPulse } from '../../services/commissioner';
 import { targetDelivery, targetReadState, reportTargetDelivery } from '../../services/targetDelivery';
 import { scopedIntelligence } from '../../services/intelligenceMetrics';
 import type { Zone } from '../../types';
+import { usePanel } from '../../components/dashboard/DetailPanel';
+import { AssetCoverageStats, CoverageDetail, type OpenReports } from '../../components/dashboard/panelBodies';
 
 export const coverageNumber=(n:number|null|undefined)=>n==null?'—':n.toLocaleString('en-IN',{maximumFractionDigits:1});
 
-export function CoverageOverview({data,loading,zone,ward,zones,rankings,official,from,to,onZone,scopeLabel,targetsReady=true}:{data:InspectionCoverage;loading:boolean;zone:string;ward:string;zones:Zone[];rankings:any[];official?:CityPulse['official'];from:string;to:string;onZone:(id:string)=>void;scopeLabel?:string;targetsReady?:boolean}) {
+export function CoverageOverview({data,loading,zone,ward,zones,rankings,official,from,to,onZone,scopeLabel,targetsReady=true,wards=[],onOpen}:{wards?:{id:string;name:string;zoneId?:string}[];onOpen?:OpenReports;data:InspectionCoverage;loading:boolean;zone:string;ward:string;zones:Zone[];rankings:any[];official?:CityPulse['official'];from:string;to:string;onZone:(id:string)=>void;scopeLabel?:string;targetsReady?:boolean}) {
   const metrics=inspectionMetrics(data,{zone,ward},official?.totals),counts=metrics.completed;
   const rows=zoneCoverage(data,zones.filter(z=>!zone||z.id===zone),rankings,ward).map(row=>({...row,...inspectionMetrics(data,{zone:row.id,ward}).completed}));
   const number=(n:number|null)=>loading?'…':coverageNumber(n);
+  const panel=usePanel();
+  const details=()=>panel?.open({title:'City coverage',subtitle:`${scopeLabel||(zone?'Selected zone':'All zones')} · registered locations inspected in the selected dates`,width:'3xl',body:<CoverageDetail data={data} modules={data.modules} zones={zones.filter(z=>!zone||z.id===zone)} wards={wards} scope={{zone:zone||undefined,ward:ward||undefined}} onOpen={onOpen}/>});
   const delivery=metrics.delivery;
   const period=(value:string)=>new Date(value+'T12:00:00Z').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Kolkata'});
   return <>
-    <section className="home-section coverage-overview"><div className="home-section-heading"><div><span>INSPECTIONS & LOCATION COVERAGE</span><h2>How much of the city have we covered?</h2><p>{period(from)}{from!==to?` – ${period(to)}`:''} · {scopeLabel||(zone?'Selected zone':'All zones')}{!scopeLabel&&ward?' · Selected ward':''}</p></div><span className="coverage-context"><MapPin size={16}/>{number(counts.percent)}{counts.percent!=null?'%':''} coverage</span></div>
-      <StatusBreakdown label="Current registered assets: inspected versus not visited" loading={loading} items={[{id:'covered',label:'Unique assets inspected',value:counts.covered,tone:'green'},{id:'remaining',label:'Not visited in selected dates',value:counts.remaining,tone:'neutral'}]}/>
+    <section className="home-section coverage-overview"><div className="home-section-heading"><div><span>INSPECTIONS & LOCATION COVERAGE</span><h2>How much of the city have we covered?</h2><p>{period(from)}{from!==to?` – ${period(to)}`:''} · {scopeLabel||(zone?'Selected zone':'All zones')}{!scopeLabel&&ward?' · Selected ward':''}</p></div><span className="coverage-context"><MapPin size={16}/>{number(counts.percent)}{counts.percent!=null?'%':''} coverage</span>{panel&&<button type="button" className="coverage-details-button" disabled={loading} onClick={details}>View coverage details<ArrowUpRight size={15}/></button>}</div>
+      <StatusBreakdown label="Current registered assets: inspected versus not visited" loading={loading} items={[{id:'covered',label:'Unique assets inspected',value:counts.covered,tone:'green'},{id:'remaining',label:'Not visited in selected dates',value:counts.remaining,tone:'neutral'}]} onSelect={panel?details:undefined}/>
+      {panel?<div role="button" tabIndex={0} className="coverage-asset-stats" data-click="true" onClick={()=>{if(!loading)details();}} onKeyDown={e=>{if(!loading&&(e.key==='Enter'||e.key===' ')){e.preventDefault();details();}}} aria-label="Open asset coverage details"><AssetCoverageStats counts={counts} loading={loading}/></div>:<div className="coverage-asset-stats"><AssetCoverageStats counts={counts} loading={loading}/></div>}
 
       <div className="chart-footnote"><CardInfo title="Coverage and inspection targets">Coverage measures unique registered assets inspected in the selected dates. Report target progress compares submitted reports with the inspection target. Daroga scoring credit is separate.</CardInfo></div>
 
