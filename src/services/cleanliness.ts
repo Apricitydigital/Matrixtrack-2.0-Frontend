@@ -36,7 +36,9 @@ const finish = (s: CleanStats) => {
   s.siPercent = si ? s.siClean / si * 100 : null;
   return s;
 };
-const unique = (visits: InspectionVisit[]) => [...new Map(visits.map(v => [v.id, v])).values()];
+/** Each inspection once; drafts (not yet submitted by the Daroga) are not counted. */
+const isDraft = (v: InspectionVisit) => String(v.raw?.status || v.status || '').toUpperCase() === 'DRAFT';
+const unique = (visits: InspectionVisit[]) => [...new Map(visits.filter(v => !isDraft(v)).map(v => [v.id, v])).values()];
 
 export function cleanlinessStats(visits: InspectionVisit[]): CleanStats {
   const s = empty();

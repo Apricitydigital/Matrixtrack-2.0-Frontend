@@ -94,7 +94,7 @@ export function CleanlinessInsights({ data, loading, modules, zones, wards, onOp
 
   return <section className="home-section cz" aria-label="Cleanliness insights">
     <div className="home-section-heading"><div><span><Sprout size={14} /> CLEANLINESS INSIGHTS</span><h2>How clean is the city?</h2><p>Every inspected place is marked Clean or Not clean, by the SI decision or, while SI review is pending, by the AI check.</p></div>
-      <CardInfo title="How cleanliness is measured"><p>Each inspection counts once. Where the SI has decided, the SI decision is used (Cleaned or Not cleaned).</p><p>For reports still awaiting SI review, the saved AI analysis is used when it reached a clear result. AI never overrides an SI decision.</p><p>Cleanliness % = clean ÷ (clean + not clean). Inspections with neither an SI decision nor a usable AI result are shown as not assessed and left out of the percentage.</p></CardInfo></div>
+      <CardInfo title="How cleanliness is measured"><p>Each inspection counts once. Where the SI has decided, the SI decision is used (Cleaned or Not cleaned).</p><p>For reports still awaiting SI review, the saved AI analysis is used when it reached a clear result. AI never overrides an SI decision.</p><p>Cleanliness % = clean ÷ (clean + not clean). Reports submitted within the last hour with no SI decision yet are shown as AI analysing, because the AI needs some time to assess them; they are left out of the percentage until the result arrives. Blurred or unclear photos are counted as not clean. Drafts are not counted.</p></CardInfo></div>
     {unavailable && <p className="coverage-data-note" role="status">Some modules could not be loaded, so cleanliness figures are incomplete.</p>}
 
     <div className="cz-verdict">
@@ -106,12 +106,12 @@ export function CleanlinessInsights({ data, loading, modules, zones, wards, onOp
       <div className="cz-summary">
         <h3>{headline}</h3>
         <p>{loading ? '' : assessed ? `Out of ${fmtNum(city.inspections)} inspections, ${fmtNum(assessed)} have a result.` : `${fmtNum(city.inspections)} inspections found, none assessed yet.`}</p>
-        <div className="cz-split" role="img" aria-label="Clean, not clean and not assessed">
+        <div className="cz-split" role="img" aria-label="Clean, not clean and AI analysing">
           <Bar s={city} />
           <ul>
             <li data-tone="green"><i /><b>{loading ? '…' : fmtNum(city.clean)}</b> Clean<small>SI {fmtNum(city.siClean)} · AI {fmtNum(city.aiClean)}</small></li>
             <li data-tone="red"><i /><b>{loading ? '…' : fmtNum(city.notClean)}</b> Not clean<small>SI {fmtNum(city.siNotClean)} · AI {fmtNum(city.aiNotClean)}</small></li>
-            <li data-tone="grey"><i /><b>{loading ? '…' : fmtNum(city.unassessed)}</b> Not assessed<small>No SI / AI result</small></li>
+            <li data-tone="grey"><i /><b>{loading ? '…' : fmtNum(city.unassessed)}</b> AI analysing<small>AI needs some time to assess</small></li>
           </ul>
         </div>
         {!loading && (bestModule || bestZone) && <p className="cz-focus"><Trophy size={14} />Cleanest so far{bestModule && <span>{bestModule.label} <b>{fmtPct(bestModule.s!.percent)}</b></span>}{bestModule && bestZone && ' and '}{bestZone && <span>{bestZone.label} <b>{fmtPct(bestZone.s!.percent)}</b></span>}</p>}
@@ -138,6 +138,6 @@ export function CleanlinessInsights({ data, loading, modules, zones, wards, onOp
       </div>
 
     </div>
-    <p className="di-legend"><Sparkles size={12} /> <span><i style={{ background: CLEAN_COLORS.clean }} />Clean</span><span><i style={{ background: CLEAN_COLORS.notClean }} />Not clean</span><span><i style={{ background: CLEAN_COLORS.unassessed }} />Not assessed</span><span>80%+ good · 60–80% fair · below 60% needs attention</span></p>
+    <p className="di-legend"><Sparkles size={12} /> <span><i style={{ background: CLEAN_COLORS.clean }} />Clean</span><span><i style={{ background: CLEAN_COLORS.notClean }} />Not clean</span><span><i style={{ background: CLEAN_COLORS.unassessed }} />AI analysing</span><span>80%+ good · 60–80% fair · below 60% needs attention</span></p>
   </section>;
 }

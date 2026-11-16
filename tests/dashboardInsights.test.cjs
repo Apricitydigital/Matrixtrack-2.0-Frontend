@@ -22,6 +22,12 @@ test('cleanliness uses the SI decision first and AI only for reports awaiting SI
  assert.deepEqual(visitCleanliness(visit('g',{status:'ACTION_REQUIRED',qc:'REJECTED'})),{verdict:'not_clean',source:'si'});
 });
 
+test('draft reports are not counted in cleanliness',()=>{
+ const d=visit('dr',{status:'DRAFT'});d.raw.createdAt='2026-01-01T00:00:00Z';
+ assert.equal(cleanlinessStats([d,visit('k',{qc:'APPROVED'})]).inspections,1);
+ assert.equal(cleanlinessStats([d]).unassessed,0);
+});
+
 test('cleanliness percentages count each inspection once and leave unassessed reports out',()=>{
  const visits=[visit('a',{qc:'APPROVED'}),visit('a',{qc:'APPROVED'}),visit('b',{qc:'REJECTED',ward:'w2'}),visit('c',{outcome:'CLEAN',zone:'z2',ward:'w3',module:'toilets'}),visit('d',{outcome:'UNASSESSABLE'})];
  const s=cleanlinessStats(visits);

@@ -110,7 +110,7 @@
 .di-take{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:0;font-size:12.5px;color:var(--muted)}
 .di-take svg{color:var(--di-poor)}.di-take span b{color:var(--di-poor)}
 .di-hero-body>.di-more{justify-self:start}
-.di-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:0;font-size:11.5px;color:var(--muted)}
+.di-legend{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 14px;margin:0;font-size:11.5px;color:var(--muted)}
 .di-legend span{display:inline-flex;align-items:center;gap:5px}
 .di-legend i{width:9px;height:9px;border-radius:3px}
 

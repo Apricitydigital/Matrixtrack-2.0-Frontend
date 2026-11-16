@@ -14,7 +14,7 @@ const nameOf = (rows: Named[], id: string, fallback: string) => rows.find(r => r
 const inScope = (scope: Scope) => (r: { module: string; zoneId: string; wardId: string }) => (!scope.module || r.module === scope.module) && (!scope.zone || r.zoneId === scope.zone) && (!scope.ward || r.wardId === scope.ward);
 
 export function CleanSplit({ stats }: { stats: CleanStats }) {
-  return <SplitBar label="Cleanliness" parts={[{ label: 'Clean', value: stats.clean, color: CLEAN_COLORS.clean }, { label: 'Not clean', value: stats.notClean, color: CLEAN_COLORS.notClean }, { label: 'Not assessed', value: stats.unassessed, color: CLEAN_COLORS.unassessed }]} />;
+  return <SplitBar label="Cleanliness" parts={[{ label: 'Clean', value: stats.clean, color: CLEAN_COLORS.clean }, { label: 'Not clean', value: stats.notClean, color: CLEAN_COLORS.notClean }, { label: 'AI analysing', value: stats.unassessed, color: CLEAN_COLORS.unassessed }]} />;
 }
 
 /** Cleanliness of one scope: SI and AI split, AI agreement and the locations found not clean. */
@@ -35,7 +35,7 @@ export function CleanlinessDetail({ data, scope, wards, onOpen, onViewReport }: 
         { label: 'SI cleanliness', value: fmtPct(stats.siPercent), note: `${fmtNum(stats.siClean + stats.siNotClean)} SI decisions` },
         { label: 'AI suggestions used', value: fmtNum(stats.aiClean + stats.aiNotClean), note: 'Reports awaiting SI review' },
         { label: 'AI agrees with SI', value: fmtPct(ai.agreement), note: ai.compared ? `${fmtNum(ai.agreed)} of ${fmtNum(ai.compared)} compared` : 'No decided reports with AI analysis' },
-        { label: 'Not assessed', value: fmtNum(stats.unassessed), note: 'No SI decision and no usable AI result' },
+        { label: 'AI analysing', value: fmtNum(stats.unassessed), note: 'AI needs some time to assess' },
       ]} />
     </PanelSection>
     <PanelSection title="Locations found not clean" note={dirty.length ? 'Most frequent first.' : undefined}>

@@ -53,7 +53,7 @@ const UNCLEAR_REASON = 'Blurred or unclear photo: cleanliness could not be verif
 const UNCLEAR_REASON_HI = 'फोटो धुंधली या स्पष्ट नहीं है, सफाई की पुष्टि नहीं हो सकी, इसलिए इसे साफ नहीं माना गया।';
 /** A report still without any saved AI result after this long is treated as an unreadable photo (AI runs within minutes of submission). */
 export const AI_GRACE_MS = 60 * 60 * 1000;
-const olderThanGrace = (raw: any) => { const t = Date.parse(String(raw?.createdAt || raw?.submittedAt || raw?.payload?.createdAt || '')); return Number.isFinite(t) && Date.now() - t > AI_GRACE_MS; };
+const olderThanGrace = (raw: any) => { if (String(raw?.status || '').toUpperCase() === 'DRAFT') return false; const t = Date.parse(String(raw?.createdAt || raw?.submittedAt || raw?.payload?.createdAt || '')); return Number.isFinite(t) && Date.now() - t > AI_GRACE_MS; };
 /** AI always gives a verdict: an unclear photo, or one the AI never analysed, cannot show clean conditions, so it counts as NOT_CLEAN with the reason stated. */
 export function intelligenceSuggestion(raw: any): IntelligenceSuggestion {
   const s = baseSuggestion(raw);
