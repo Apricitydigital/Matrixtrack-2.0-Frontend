@@ -76,17 +76,18 @@ export function CleanlinessInsights({ data, loading, modules, zones, wards, onOp
   const items: Item[] = dim === 'module' ? modules.map(m => ({ id: m, label: MODULE_LABELS[m] || m, s: byModule.get(m), scope: { module: m }, kind: 'Module cleanliness' }))
     : dim === 'zone' ? zones.map(z => ({ id: z.id, label: z.name, s: byZone.get(z.id), scope: { zone: z.id, ...extra }, kind: 'Zone cleanliness' }))
     : wards.map(w => ({ id: w.id, label: w.name, sub: zones.find(z => z.id === w.zoneId)?.name, s: byWard.get(w.id), scope: { ward: w.id, ...extra }, kind: 'Ward cleanliness' })).filter(r => r.s && r.s.inspections > 0);
-  const ranked = useMemo(() => [...items].sort((a, b) => {
+  const ranked = [...items].sort((a, b) => {
     const pa = a.s?.percent ?? null, pb = b.s?.percent ?? null;
     if (pa == null || pb == null) return pa == null && pb == null ? 0 : pa == null ? 1 : -1;
     const n = (s: CleanStats) => s.clean + s.notClean;
     return order === 'worst' ? pa - pb || b.s!.notClean - a.s!.notClean : pb - pa || n(b.s!) - n(a.s!);
-  }).concat([]), [items.map(i => `${i.id}:${i.s?.clean}:${i.s?.notClean}:${i.s?.inspections}`).join('|'), order]); // eslint-disable-line react-hooks/exhaustive-deps
+  });
   const shown = all ? ranked : ranked.slice(0, 7);
 
   const strongest = (rows: { label: string; s?: CleanStats }[]) => rows.filter(r => r.s && r.s.percent != null).sort((a, b) => b.s!.percent! - a.s!.percent! || (b.s!.clean + b.s!.notClean) - (a.s!.clean + a.s!.notClean))[0];
   const bestModule = strongest(modules.map(m => ({ label: MODULE_LABELS[m] || m, s: byModule.get(m) })));
-  const bestZone = strongest(zones.map(z => ({ label: z.name, s: cleanlinessBy(data.visits, 'zoneId').get(z.id) })));
+  const allZones = useMemo(() => cleanlinessBy(data.visits, 'zoneId'), [data.visits]);
+  const bestZone = strongest(zones.map(z => ({ label: z.name, s: allZones.get(z.id) })));
 
 
   const show = (title: string, subtitle: string, scope: Scope) => panel?.open({ title, subtitle, body: <CleanlinessDetail data={data} scope={scope} wards={wards} onOpen={onOpen} onViewReport={onViewReport} /> });

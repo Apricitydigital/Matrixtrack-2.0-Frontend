@@ -43,3 +43,20 @@ test('the ULB operations dashboard renders intelligence counts alongside the off
   assert.match(html,/Intelligence suggested clean/);assert.match(html,/Intelligence suggested not cleaned/);
  } finally {coverageHook.useInspectionCoverage=originalCoverage;commissioner.useCityPulse=originalPulse;}
 });
+
+test('AI gets sixty minutes from submission, including old drafts and compact timestamp metadata',()=>{
+ const {intelligenceSuggestion:suggest}=require('../src/services/intelligenceSuggestion');
+ const originalNow=Date.now,now=Date.parse('2026-11-16T12:00:00Z');Date.now=()=>now;
+ const old=new Date(now-86400000).toISOString(),fresh=new Date(now-30*60000).toISOString();
+ try{
+  for(const submission of [{submittedAt:fresh},{payload:{lastSubmittedAt:fresh}},{payload:{submittedAt:fresh}},{aiSubmittedAt:fresh,submittedAt:old},{submittedAt:'invalid',payload:{lastSubmittedAt:fresh}}]){
+   assert.equal(suggest({status:'SUBMITTED',createdAt:old,...submission}).outcome,'AWAITING_AI');
+  }
+  assert.equal(suggest({status:'SUBMITTED',createdAt:old,submittedAt:new Date(now-60*60000+1).toISOString()}).outcome,'AWAITING_AI');
+  assert.equal(suggest({status:'SUBMITTED',createdAt:old,submittedAt:new Date(now-60*60000).toISOString()}).outcome,'NOT_CLEAN');
+  assert.equal(suggest({status:'DRAFT',createdAt:old}).outcome,'AWAITING_AI');
+  assert.equal(suggest({status:'SUBMITTED',workspaceStatus:'DRAFT',createdAt:old}).outcome,'AWAITING_AI');
+  assert.equal(suggest({status:'SUBMITTED',createdAt:old}).outcome,'NOT_CLEAN');
+  assert.equal(suggest({status:'SUBMITTED',submittedAt:'invalid'}).outcome,'AWAITING_AI');
+ }finally{Date.now=originalNow;}
+});

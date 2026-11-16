@@ -96,7 +96,7 @@ test('cleanliness insights and the module AI strip render from the same register
  const assets=[{id:'a0',key:'sweeping:a0',module:'sweeping',zoneId:'z1',wardId:'w1',name:'Beat 0'},{id:'a1',key:'sweeping:a1',module:'sweeping',zoneId:'z1',wardId:'w1',name:'Beat 1'}];
  const data={...emptyCoverage(),from:'2026-11-05',to:'2026-11-05',modules:['sweeping'],inventoryAvailable:true,assets,visits:[visit('1',{asset:'a0',qc:'APPROVED',outcome:'CLEAN'}),visit('2',{asset:'a0',outcome:'NOT_CLEAN'})]};
  const html=renderToStaticMarkup(React.createElement(CleanlinessInsights,{data,loading:false,modules:['sweeping'],zones:[{id:'z1',name:'Zone 1'}],wards:[{id:'w1',name:'Ward 1',zoneId:'z1'}]}));
- assert.match(html,/data-metric="city-cleanliness">50%/);assert.match(html,/By module/);assert.match(html,/By zone/);assert.match(html,/Ward 1/);
+ assert.match(html,/data-metric="city-cleanliness">50%/);assert.match(html,/>Modules</);assert.match(html,/>Zones</);assert.match(html,/Ward 1/);
  const summary=renderToStaticMarkup(React.createElement(CleanedSummary,{data,loading:false}));
  assert.match(summary,/data-metric="summary-cleaned">1</);assert.match(summary,/data-metric="summary-not-cleaned">0</);assert.match(summary,/50% clean/);
  const card=renderToStaticMarkup(React.createElement(ModuleDelivery,{modules:['sweeping'],pulse:{pending:0,errors:{}},data,loading:false,zone:'',ward:'',onInspect:()=>{}}));
@@ -104,16 +104,36 @@ test('cleanliness insights and the module AI strip render from the same register
 });
 
 
-test('cleanliness dashboard shows only the five worst assessed wards',()=>{
+test('cleanliness dashboard defaults to seven best wards and offers all wards',()=>{
  const {CleanlinessInsights}=require('../src/components/dashboard/CleanlinessInsights.tsx');
  const wards=Array.from({length:8},(_,i)=>({id:`w${i}`,name:`Area ${i}`,zoneId:'z1'}));
  const visits=wards.flatMap((w,i)=>Array.from({length:10},(_,j)=>visit(`${w.id}-${j}`,{ward:w.id,qc:j<i?'APPROVED':'REJECTED'})));
  const data={...emptyCoverage(),visits,inventoryAvailable:true,modules:['sweeping']};
  const html=renderToStaticMarkup(React.createElement(CleanlinessInsights,{data,loading:false,modules:['sweeping'],zones:[{id:'z1',name:'Zone 1'}],wards}));
- assert.match(html,/Worst 5 wards/);assert.equal((html.match(/<button[^>]*data-band=/g)||[]).length,5);
- for(let i=0;i<5;i++)assert.match(html,new RegExp(`Area ${i}`));
- for(let i=5;i<8;i++)assert.doesNotMatch(html,new RegExp(`Area ${i}`));
- assert.doesNotMatch(html,/All 8 wards|>Draft</);
+ assert.match(html,/Best first/);assert.equal((html.match(/<button[^>]*data-band=/g)||[]).length,7);
+ for(let i=1;i<8;i++)assert.match(html,new RegExp(`Area ${i}`));
+ assert.doesNotMatch(html,/Area 0|>Draft</);assert.match(html,/Show all 8/);
+});
+
+test('switching modules with equal counts opens the current ward and zone scope',()=>{
+ const panel=require('../src/components/dashboard/DetailPanel.tsx'),original={useState:React.useState,useMemo:React.useMemo,usePanel:panel.usePanel};
+ const states=[],memos=[];let si=0,mi=0,opened;
+ React.useState=initial=>{const at=si++;if(!(at in states))states[at]=initial;return [states[at],value=>{states[at]=typeof value==='function'?value(states[at]):value;}];};
+ React.useMemo=(read,deps)=>{const at=mi++;if(!memos[at]||deps.some((dep,i)=>!Object.is(dep,memos[at].deps[i])))memos[at]={value:read(),deps};return memos[at].value;};
+ panel.usePanel=()=>({open:value=>{opened=value;}});
+ const {CleanlinessInsights}=require('../src/components/dashboard/CleanlinessInsights.tsx');
+ const nodes=tree=>Array.isArray(tree)?tree.flatMap(nodes):!tree||typeof tree!=='object'?[]:[tree,...nodes(tree.props?.children)];
+ const props={data:{...emptyCoverage(),visits:[visit('a',{module:'sweeping',outcome:'CLEAN'}),visit('b',{module:'toilets',outcome:'CLEAN'})]},loading:false,modules:['sweeping','toilets'],zones:[{id:'z1',name:'Zone 1'}],wards:[{id:'w1',name:'Ward 1',zoneId:'z1'}]};
+ const render=()=>{si=0;mi=0;return CleanlinessInsights(props);};
+ const filter=(tree,value)=>nodes(tree).find(n=>n.props?.['aria-label']==='Filter by module').props.onChange({target:{value}});
+ const openRow=tree=>nodes(nodes(tree).find(n=>n.props?.className==='cz-list')).find(n=>n.type==='button').props.onClick();
+ try{
+  let tree=render();filter(tree,'sweeping');tree=render();filter(tree,'toilets');tree=render();openRow(tree);
+  assert.deepEqual(opened.body.props.scope,{ward:'w1',module:'toilets'});
+  nodes(tree).find(n=>n.type==='button'&&n.props.children==='Zones').props.onClick();tree=render();filter(tree,'sweeping');tree=render();filter(tree,'toilets');tree=render();openRow(tree);
+  assert.deepEqual(opened.body.props.scope,{zone:'z1',module:'toilets'});
+  filter(tree,'');tree=render();openRow(tree);assert.deepEqual(opened.body.props.scope,{zone:'z1'});
+ }finally{React.useState=original.useState;React.useMemo=original.useMemo;panel.usePanel=original.usePanel;}
 });
 
 test('single-pass cleanliness breakdown retains deduplication, SI priority and every group total',()=>{
