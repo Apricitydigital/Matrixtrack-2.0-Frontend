@@ -98,12 +98,13 @@ export function pendingLocations(data: Pick<InspectionCoverage, 'assets' | 'visi
 export function aiAnalysis(visits: InspectionVisit[]) {
   const out = { analysed: 0, clean: 0, notClean: 0, unassessable: 0, awaiting: 0, compared: 0, agreed: 0, agreement: null as number | null };
   for (const v of unique(visits)) {
-    const outcome = intelligenceSuggestion({ ...v.raw, status: v.raw?.workspaceStatus || v.status }).outcome;
+    const sug = intelligenceSuggestion({ ...v.raw, status: v.raw?.workspaceStatus || v.status }), outcome = sug.outcome;
     if (outcome === 'AWAITING_AI') { out.awaiting++; continue; }
     out.analysed++;
     if (outcome === 'CLEAN') out.clean++; else if (outcome === 'NOT_CLEAN') out.notClean++; else out.unassessable++;
+    if (sug.unclear) out.unassessable++;
     const verdict = visitCleanliness(v), si = verdict.source !== 'si' ? '' : verdict.verdict === 'clean' ? 'CLEAN' : 'NOT_CLEAN';
-    if (si && outcome !== 'UNASSESSABLE') { out.compared++; if (si === outcome) out.agreed++; }
+    if (si && !sug.unclear) { out.compared++; if (si === outcome) out.agreed++; }
   }
   out.agreement = out.compared ? out.agreed / out.compared * 100 : null;
   return out;

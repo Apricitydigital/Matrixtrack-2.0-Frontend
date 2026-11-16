@@ -89,10 +89,10 @@ function darogaAdvice(id: string, input: Input, wardName: (id: string) => string
   // 4. Saved AI analysis on this officer's reports.
   let analysed = 0, unclear = 0, aiFlagged = 0;
   for (const v of mine) {
-    const outcome = intelligenceSuggestion({ ...v.raw, status: v.raw?.workspaceStatus || v.status }).outcome;
+    const sug = intelligenceSuggestion({ ...v.raw, status: v.raw?.workspaceStatus || v.status }), outcome = sug.outcome;
     if (outcome === 'AWAITING_AI') continue;
     analysed++;
-    if (outcome === 'UNASSESSABLE') unclear++;
+    if (sug.unclear) unclear++;
     if (outcome === 'NOT_CLEAN' && visitCleanliness(v).source === 'ai') aiFlagged++;
   }
   if (aiFlagged >= 2) suggestions.push({ title: 'Act on AI-flagged reports before SI review',

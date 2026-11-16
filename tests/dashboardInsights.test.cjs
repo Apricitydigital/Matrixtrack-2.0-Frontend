@@ -15,7 +15,9 @@ test('cleanliness uses the SI decision first and AI only for reports awaiting SI
  assert.deepEqual(visitCleanliness(visit('c',{status:'APPROVED'})),{verdict:'clean',source:'si'});
  assert.deepEqual(visitCleanliness(visit('d',{outcome:'CLEAN'})),{verdict:'clean',source:'ai'});
  assert.deepEqual(visitCleanliness(visit('e',{outcome:'NOT_CLEAN'})),{verdict:'not_clean',source:'ai'});
- assert.deepEqual(visitCleanliness(visit('f',{outcome:'UNASSESSABLE'})),{verdict:'unassessed',source:null});
+ // An unclear photo is judged not clean by the AI (never left unassessed).
+ assert.deepEqual(visitCleanliness(visit('f',{outcome:'UNASSESSABLE'})),{verdict:'not_clean',source:'ai'});
+ assert.deepEqual(visitCleanliness(visit('h')),{verdict:'unassessed',source:null});
  // Corrective workflow keeps the permanent SI decision.
  assert.deepEqual(visitCleanliness(visit('g',{status:'ACTION_REQUIRED',qc:'REJECTED'})),{verdict:'not_clean',source:'si'});
 });
@@ -23,9 +25,9 @@ test('cleanliness uses the SI decision first and AI only for reports awaiting SI
 test('cleanliness percentages count each inspection once and leave unassessed reports out',()=>{
  const visits=[visit('a',{qc:'APPROVED'}),visit('a',{qc:'APPROVED'}),visit('b',{qc:'REJECTED',ward:'w2'}),visit('c',{outcome:'CLEAN',zone:'z2',ward:'w3',module:'toilets'}),visit('d',{outcome:'UNASSESSABLE'})];
  const s=cleanlinessStats(visits);
- assert.equal(s.inspections,4);assert.equal(s.clean,2);assert.equal(s.notClean,1);assert.equal(s.unassessed,1);
+ assert.equal(s.inspections,4);assert.equal(s.clean,2);assert.equal(s.notClean,2);assert.equal(s.unassessed,0);
  assert.equal(s.siClean,1);assert.equal(s.aiClean,1);assert.equal(s.siNotClean,1);
- assert.equal(Math.round(s.percent*10)/10,66.7);assert.equal(s.siPercent,50);
+ assert.equal(s.percent,50);assert.equal(s.siPercent,50);
  assert.equal(cleanlinessBy(visits,'zoneId').get('z2').clean,1);
  assert.equal(cleanlinessBy(visits,'module').get('sweeping').inspections,3);
  assert.equal(cleanlinessBy(visits,'wardId').get('w2').percent,0);
@@ -45,7 +47,7 @@ test('pending locations are registered assets without an inspection, matching co
 
 test('AI analysis reports agreement only where an SI decision and a clear AI result both exist',()=>{
  const a=aiAnalysis([visit('a',{qc:'APPROVED',outcome:'CLEAN'}),visit('b',{qc:'REJECTED',outcome:'CLEAN'}),visit('c',{outcome:'NOT_CLEAN'}),visit('d',{qc:'APPROVED',outcome:'UNASSESSABLE'}),visit('e')]);
- assert.equal(a.analysed,4);assert.equal(a.awaiting,1);assert.equal(a.clean,2);assert.equal(a.notClean,1);assert.equal(a.unassessable,1);
+ assert.equal(a.analysed,4);assert.equal(a.awaiting,1);assert.equal(a.clean,2);assert.equal(a.notClean,2);assert.equal(a.unassessable,1);
  assert.equal(a.compared,2);assert.equal(a.agreed,1);assert.equal(a.agreement,50);
 });
 

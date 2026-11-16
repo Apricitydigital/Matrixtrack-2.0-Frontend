@@ -8,7 +8,7 @@ const {IntelligenceSummary,IntelligenceSuggestion}=require('../src/components/re
 const raw=(id,status,outcome,confidence=.88)=>({id,status,createdAt:'2026-11-04T05:00:00Z',autoQcResult:{decision:'APPROVED',cleanliness:{outcome,confidence,reasons:['Visible waste at the location'],reasonsHi:['यहाँ कचरा दिखाई दे रहा है']}}});
 test('SI decisions stay official; only human-pending records enter the separate AI counts',()=>{
  const rows=[raw('1','SUBMITTED','CLEAN'),raw('2','SUBMITTED','NOT_CLEAN'),raw('3','APPROVED','CLEAN'),raw('4','REJECTED','NOT_CLEAN'),raw('5','DRAFT','CLEAN'),{id:'6',status:'PENDING_QC'},{...raw('7','SUBMITTED','NOT_CLEAN'),qcDecision:'REJECTED'}, {id:'8',status:'SUBMITTED',autoQcResult:{decision:'APPROVED',checks:[{result:'MATCH'}]}}];
- assert.deepEqual(intelligenceCounts(rows),{CLEAN:1,NOT_CLEAN:1,UNASSESSABLE:1,AWAITING_AI:1});
+ assert.deepEqual(intelligenceCounts(rows),{CLEAN:1,NOT_CLEAN:2,UNASSESSABLE:0,AWAITING_AI:1});
  const report=mapReport(rows[1],'sweeping','city',[]);assert.equal(report.status,'pending_review');assert.equal(report.intelligenceSuggestion.outcome,'NOT_CLEAN');assert.equal(report.intelligenceSuggestion.confidencePercent,88);
  assert.equal(matchesFilters(report,{...emptyFilters(),status:intelligenceFilter('NOT_CLEAN')},[]),true);
  assert.equal(matchesFilters(report,{...emptyFilters(),status:'rejected'},[]),false);
