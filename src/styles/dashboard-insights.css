@@ -242,3 +242,26 @@
 .cz-list [data-band=none] em{font-size:11px;font-weight:600}
 @media(max-width:640px){.cz-list button{grid-template-columns:24px 1fr 70px}.cz-meter{display:none}}
 .cz-more{justify-self:start;font-size:12.5px;font-weight:600;color:var(--di-blue)}
+
+/* Coverage overview (cv-) */
+.cv-body{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.4fr);gap:16px;padding:20px 24px}
+@media(max-width:900px){.cv-body{grid-template-columns:1fr;padding:16px}}
+.cv-main{display:grid;gap:8px;align-content:center;padding:20px 22px;border-radius:14px;border:1px solid var(--line);border-left:5px solid #2a78d6;background:var(--surface-soft);text-align:left}
+.cv-main[data-click=true]{cursor:pointer;transition:box-shadow .15s}.cv-main[data-click=true]:hover{box-shadow:0 6px 18px #0b24351a}
+.cv-eyebrow{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.cv-chart{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.cv-donut{position:relative;width:170px;height:170px;flex:none}
+.cv-donut svg{width:100%;height:100%}
+.cv-donut .cv-pct{position:absolute;inset:0;display:grid;place-items:center;padding-bottom:16px;font-size:30px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.cv-donut small{position:absolute;left:0;right:0;top:61%;text-align:center;font-size:11.5px;color:var(--muted)}
+.cv-main>p{margin:0;font-size:13px;color:var(--muted)}
+.cv-legend{display:grid;gap:10px;margin:0;padding:0;list-style:none;font-size:12.5px;color:var(--muted);flex:1;min-width:150px}
+.cv-legend li{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--ink)}
+.cv-legend i{width:11px;height:11px;border-radius:3px;background:#2a78d6;flex:none}.cv-legend i[data-t=rest]{background:#eda100}
+.cv-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0}
+@media(max-width:480px){.cv-stats{grid-template-columns:1fr}}
+.cv-stats>div{display:grid;gap:3px;align-content:center;padding:14px 16px;border-radius:12px;border:1px solid var(--line);border-left:4px solid var(--line);background:var(--surface)}
+.cv-stats>div[data-t=done]{border-left-color:#2a78d6}.cv-stats>div[data-t=rest]{border-left-color:#eda100}.cv-stats>div[data-t=warn]{border-left-color:#d03b3b}
+.cv-stats dt{font-size:12px;font-weight:600;color:var(--muted)}
+.cv-stats dd{margin:0;font-size:26px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.cv-stats small{font-size:11.5px;color:var(--muted)}

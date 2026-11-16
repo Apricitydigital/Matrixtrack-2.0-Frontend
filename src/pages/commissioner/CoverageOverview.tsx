@@ -1,10 +1,9 @@
 import {CardInfo} from '../../components/common/CardInfo';
-import {StatusBreakdown} from '../../components/analytics/StatusBreakdown';
 import { inspectionMetrics } from '../../services/inspectionMetrics';
 import { inspectionPeriod } from '../../services/inspectionPeriod';
 import { COMMISSIONER_TERMS as terms } from '../../services/commissionerTerms';
 import React from 'react';
-import { ArrowUpRight, Info, MapPin, Target } from 'lucide-react';
+import { ArrowUpRight, Info, Target } from 'lucide-react';
 import type { InspectionCoverage } from '../../services/inspectionCoverage';
 import { coverageCounts, zoneCoverage, inspectionOutcomes } from '../../services/inspectionCoverage';
 import type { CityPulse } from '../../services/commissioner';
@@ -12,11 +11,11 @@ import { targetDelivery, targetReadState, reportTargetDelivery } from '../../ser
 import { scopedIntelligence } from '../../services/intelligenceMetrics';
 import type { Zone } from '../../types';
 import { usePanel } from '../../components/dashboard/DetailPanel';
-import { AssetCoverageStats, CoverageDetail, type OpenReports } from '../../components/dashboard/panelBodies';
+import { CoverageDetail, type OpenReports } from '../../components/dashboard/panelBodies';
 
 export const coverageNumber=(n:number|null|undefined)=>n==null?'N/A':n.toLocaleString('en-IN',{maximumFractionDigits:1});
 
-export function CoverageOverview({data,loading,zone,ward,zones,rankings,official,from,to,onZone,scopeLabel,targetsReady=true,wards=[],onOpen,onCoverage}:{onCoverage?:(scope:{module?:string;zone?:string;ward?:string})=>void;wards?:{id:string;name:string;zoneId?:string}[];onOpen?:OpenReports;data:InspectionCoverage;loading:boolean;zone:string;ward:string;zones:Zone[];rankings:any[];official?:CityPulse['official'];from:string;to:string;onZone:(id:string)=>void;scopeLabel?:string;targetsReady?:boolean}) {
+export function CoverageOverview({data,loading,zone,ward,zones,rankings,official,from,to,onZone,scopeLabel,targetsReady=true,wards=[],onOpen,onCoverage,part='all'}:{part?:'all'|'coverage'|'zones';onCoverage?:(scope:{module?:string;zone?:string;ward?:string})=>void;wards?:{id:string;name:string;zoneId?:string}[];onOpen?:OpenReports;data:InspectionCoverage;loading:boolean;zone:string;ward:string;zones:Zone[];rankings:any[];official?:CityPulse['official'];from:string;to:string;onZone:(id:string)=>void;scopeLabel?:string;targetsReady?:boolean}) {
   const metrics=inspectionMetrics(data,{zone,ward},official?.totals),counts=metrics.completed;
   const rows=zoneCoverage(data,zones.filter(z=>!zone||z.id===zone),rankings,ward).map(row=>({...row,...inspectionMetrics(data,{zone:row.id,ward}).completed}));
   const number=(n:number|null)=>loading?'…':coverageNumber(n);
@@ -25,16 +24,30 @@ export function CoverageOverview({data,loading,zone,ward,zones,rankings,official
   const delivery=metrics.delivery;
   const period=(value:string)=>new Date(value+'T12:00:00Z').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Kolkata'});
   return <>
-    <section className="home-section coverage-overview"><div className="home-section-heading"><div><span>INSPECTIONS & LOCATION COVERAGE</span><h2>How much of the city have we covered?</h2><p>{period(from)}{from!==to?` – ${period(to)}`:''} · {scopeLabel||(zone?'Selected zone':'All zones')}{!scopeLabel&&ward?' · Selected ward':''}</p></div><span className="coverage-context"><MapPin size={16}/>{number(counts.percent)}{counts.percent!=null?'%':''} coverage</span>{panel&&<button type="button" className="coverage-details-button" disabled={loading} onClick={details}>View coverage details<ArrowUpRight size={15}/></button>}</div>
-      <StatusBreakdown label="Current registered assets: inspected versus not visited" loading={loading} items={[{id:'covered',label:'Unique assets inspected',value:counts.covered,tone:'green'},{id:'remaining',label:'Not visited in selected dates',value:counts.remaining,tone:'neutral'}]} onSelect={panel?details:undefined}/>
-      {panel?<div role="button" tabIndex={0} className="coverage-asset-stats" data-click="true" onClick={()=>{if(!loading)details();}} onKeyDown={e=>{if(!loading&&(e.key==='Enter'||e.key===' ')){e.preventDefault();details();}}} aria-label="Open asset coverage details"><AssetCoverageStats counts={counts} loading={loading}/></div>:<div className="coverage-asset-stats"><AssetCoverageStats counts={counts} loading={loading}/></div>}
-
-      <div className="chart-footnote"><CardInfo title="Coverage and inspection targets">Coverage measures unique registered assets inspected in the selected dates. Report target progress compares submitted reports with the inspection target. Daroga scoring credit is separate.</CardInfo></div>
-
+    {part!=='zones'&&<section className="home-section coverage-overview cv"><div className="home-section-heading"><div><span>INSPECTIONS & LOCATION COVERAGE</span><h2>How much of the city have we covered?</h2><p>{period(from)}{from!==to?` – ${period(to)}`:''} · {scopeLabel||(zone?'Selected zone':'All zones')}{!scopeLabel&&ward?' · Selected ward':''}</p></div><CardInfo title="Coverage and inspection targets">Coverage measures unique registered assets inspected in the selected dates. Report target progress compares submitted reports with the inspection target. Daroga scoring credit is separate.</CardInfo>{panel&&<button type="button" className="coverage-details-button" disabled={loading} onClick={details}>View coverage details<ArrowUpRight size={15}/></button>}</div>
+      <div className="cv-body">
+        <div className="cv-main" data-click={panel?'true':undefined} {...(panel?{role:'button',tabIndex:0,'aria-label':'Open asset coverage details',onClick:()=>{if(!loading)details();},onKeyDown:(e:React.KeyboardEvent)=>{if(!loading&&(e.key==='Enter'||e.key===' ')){e.preventDefault();details();}}}:{})}>
+          <span className="cv-eyebrow">Overall coverage</span>
+          <div className="cv-chart">
+            <div className="cv-donut" role="img" aria-label={`${number(counts.covered)} covered, ${number(counts.remaining)} not covered`}>
+              <svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="48" fill="none" stroke="#eda100" strokeOpacity=".35" strokeWidth="16"/>{!loading&&(counts.percent??0)>0&&<circle cx="60" cy="60" r="48" fill="none" stroke="#2a78d6" strokeWidth="16" strokeLinecap={(counts.percent??0)>=100?'butt':'round'} strokeDasharray={`${Math.min(100,counts.percent??0)/100*301.6} 301.6`} transform="rotate(-90 60 60)"/>}</svg>
+              <strong className="cv-pct">{number(counts.percent)}{counts.percent!=null&&!loading?'%':''}</strong><small>covered</small>
+            </div>
+            <ul className="cv-legend"><li><i data-t="done"/>Covered</li><li><i data-t="rest"/>Not covered</li></ul>
+          </div>
+          <p>of registered locations are covered, meaning inspected at least once in the selected dates.</p>
+        </div>
+        <dl className="cv-stats">
+          <div><dt>Registered locations</dt><dd>{number(counts.total)}</dd><small>Current location register</small></div>
+          <div data-t="done"><dt>Covered</dt><dd>{number(counts.covered)}</dd><small>{counts.percent==null?'Unique locations':`${number(counts.percent)}% of registered locations`}</small></div>
+          <div data-t="rest"><dt>Not covered</dt><dd>{number(counts.remaining)}</dd><small>Not inspected in these dates</small></div>
+          <div data-t={counts.outsideRegister?'warn':undefined}><dt>Not in register</dt><dd>{number(counts.outsideRegister)}</dd><small>Inspected but missing from the register</small></div>
+        </dl>
+      </div>
       {!loading&&(counts.unidentified>0||counts.outsideRegister>0)&&<p className="coverage-data-note">{counts.unidentified>0?`${counts.unidentified} reports lack a location ID; exact unique and repeat counts are unavailable. `:''}{counts.outsideRegister>0?`${counts.outsideRegister} inspected locations are outside the current register and excluded from registered-location coverage.`:''}</p>}
       {data.errors.length>0&&<div className="coverage-data-note" role="status">Some coverage figures are unavailable.<details><summary>View availability</summary>{data.errors.map(e=><p key={e}>{e}</p>)}</details></div>}
-    </section>
-    <section className="home-section zone-performance"><div className="home-section-heading"><div><span>ZONE PERFORMANCE</span><h2>Zone performance</h2><p>Compare targets, inspections, location coverage and pending review.</p></div>{(zone||scopeLabel&&scopeLabel!=='All zones and wards')&&<button onClick={()=>onZone('')}>All zones<ArrowUpRight size={15}/></button>}</div>
+    </section>}
+    {part!=='coverage'&&<section className="home-section zone-performance"><div className="home-section-heading"><div><span>ZONE PERFORMANCE</span><h2>Zone performance</h2><p>Compare targets, inspections, location coverage and pending review.</p></div>{(zone||scopeLabel&&scopeLabel!=='All zones and wards')&&<button onClick={()=>onZone('')}>All zones<ArrowUpRight size={15}/></button>}</div>
       <div className="zone-table-wrap"><table className="zone-delivery-table"><thead><tr><th>Zone</th><th>Inspection target achievement</th><th>Inspections still needed</th><th>{terms.coverage}</th><th>{terms.pendingReview}</th><th>SI cleaned</th><th>SI not cleaned</th><th>AI suggests clean</th><th>AI suggests not clean</th><th>Ward score average<CardInfo title="Ward score average">Average of assessed wards in the selected area.</CardInfo></th></tr></thead><tbody>{rows.map(row=>{
         const source=official?.zones?.find(z=>z.id===row.id),target=reportTargetDelivery(targetReadState(targetDelivery(source?.totals,row),targetsReady),row.inspections);
         return <tr key={row.id}><td data-label="Zone"><button className="zone-select" onClick={()=>onZone(row.id)}><strong>{row.name}</strong><ArrowUpRight size={15}/></button></td>
@@ -47,6 +60,6 @@ export function CoverageOverview({data,loading,zone,ward,zones,rankings,official
             <td data-label="AI suggests clean" title="AI suggestion on reports awaiting SI review; not an official decision">{number(ai?ai.clean:null)}</td><td data-label="AI suggests not clean" title="AI suggestion on reports awaiting SI review; not an official decision">{number(ai?ai.notClean:null)}</td></>;})()}
           <td data-label="Ward score average"><strong className="delivery-count">{coverageNumber(row.wardAverage)}<small>{row.wardAverage!=null?' / 100':''}</small></strong><small className="delivery-caption">{row.assessed} assessed wards</small></td></tr>;
       })}</tbody></table></div>{!rows.length&&<div className="home-empty">No zones in the selected scope.</div>}
-    </section>
+    </section>}
   </>;
 }
