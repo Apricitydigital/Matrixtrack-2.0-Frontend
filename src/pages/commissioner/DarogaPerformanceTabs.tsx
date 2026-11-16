@@ -12,7 +12,7 @@ import { canonicalModuleKey } from '../../services/moduleKeys';
 
 type Officer = { user: User; stat: any };
 export type DarogaTab = 'overall' | 'inspection' | 'attendance' | 'cleaned';
-export const DAROGA_TABS: [DarogaTab, string][] = [['overall', 'Overall'], ['inspection', 'Inspection performance'], ['attendance', 'Attendance'], ['cleaned', 'Cleaned vs Not cleaned']];
+export const DAROGA_TABS: [DarogaTab, string][] = [['overall', 'Overall'], ['inspection', 'Inspection targets'], ['attendance', 'Attendance'], ['cleaned', 'Report results']];
 const Score = ({value, pending = false}: {value: number | null | undefined; pending?: boolean}) => <span className="officer-score" data-tone={value == null || pending ? 'muted' : value >= 75 ? 'good' : value >= 40 ? 'fair' : 'low'}><strong>{pending ? 'Loading...' : pct(value)}</strong>{value != null && !pending && <span className="officer-score-track" aria-hidden="true"><i style={{width: `${Math.min(100, Math.max(0, value))}%`}}/></span>}</span>;
 const pct = (v: number | null | undefined) => v == null ? 'Not assessed' : `${v.toFixed(1)}%`;
 
@@ -51,10 +51,10 @@ export function DarogaPerformanceTabs({ city, module, rows, tab, onTab, rawStats
   const covLoading = coverage.loading, attLoading = attendance.status === 'loading';
 
   const head: Record<DarogaTab, string[]> = {
-    overall: ['Overall score', 'Inspection (40%)', 'Cleaned (40%)', 'Attendance (20%)'],
+    overall: ['Overall score', 'Inspection target (40%)', 'Cleanliness (40%)', 'Attendance (20%)'],
     inspection: ['Score', 'Credited', 'Target'],
     attendance: ['Score', 'Present days', 'Selected days', 'Recorded days', 'Absent days', 'Missing days'],
-    cleaned: ['Score', 'Cleaned', 'Not cleaned', 'By SI decision', 'By AI suggestion', 'Not assessable']
+    cleaned: ['Cleanliness score', 'Clean reports', 'Not clean reports', 'SI reviewed', 'AI assessed', 'Not assessed']
   };
   const cells = (d: typeof data[number]): React.ReactNode[] => {
     const att = d.att, c = d.cleaned;
@@ -64,10 +64,10 @@ export function DarogaPerformanceTabs({ city, module, rows, tab, onTab, rawStats
     return covLoading ? [<b key="s">…</b>, '…', '…', '…', '…', '…'] : [<Score key="s" value={c.score}/>, c.cleaned, c.notCleaned, c.siDecided, c.aiSuggested, c.unassessed];
   };
   const note: Record<DarogaTab, string> = {
-    overall: `Overall = Inspection ${DAROGA_WEIGHTS.inspection}% + Cleaned ${DAROGA_WEIGHTS.cleaned}% + Attendance ${DAROGA_WEIGHTS.attendance}%. A part with no score is left out and the remaining weights are rescaled.`,
+    overall: `Overall = Inspection target ${DAROGA_WEIGHTS.inspection}% + Cleanliness ${DAROGA_WEIGHTS.cleaned}% + Attendance ${DAROGA_WEIGHTS.attendance}%. A part with no score is left out and the remaining weights are rescaled.`,
     inspection: 'Credited inspections ÷ assigned inspection target, capped at 100%.',
     attendance: 'Present days ÷ all calendar days in the selected dates (inclusive). Missing records earn no attendance credit and are shown separately from recorded absences. Matched by the system link (Aadhaar or name), employee ID or phone, then name; unmatched users show Not matched.',
-    cleaned: 'Cleaned ÷ (Cleaned + Not cleaned), for the selected module. Uses the saved SI decision (Approved = cleaned; Rejected = not cleaned), even after corrective action. Reports without an SI decision use the AI suggestion. Reports without an assessable result are excluded.'
+    cleaned: 'Cleanliness score = clean reports / (clean + not clean reports) x 100. Each report uses the SI decision when available; otherwise it uses the saved AI suggestion. Reports without a result are excluded. Counts are reports, not people or unique locations.'
   };
   const assessed = data.filter(d => d.overall.score != null);
   const average = assessed.length ? assessed.reduce((sum,d) => sum + d.overall.score!,0) / assessed.length : null;
@@ -76,12 +76,13 @@ export function DarogaPerformanceTabs({ city, module, rows, tab, onTab, rawStats
     <div className="officer-overview" aria-label="Selected Daroga summary">
       <article><span>Officers in view</span><strong>{data.length}</strong><p>Within your current filters</p></article>
       <article className="officer-overview-primary"><span>Average overall score</span><strong>{summaryPending ? 'Loading...' : pct(average)}</strong><p>{summaryPending ? 'Reading selected-period data' : `${assessed.length} officers with an assessed score`}</p></article>
-      <article><span>Cleanliness results</span><strong>{covLoading ? 'Loading...' : data.reduce((n,d) => n+d.cleaned.cleaned,0)}<small> cleaned</small></strong><p>{covLoading ? 'Reading SI and AI results' : `${data.reduce((n,d) => n+d.cleaned.notCleaned,0)} not cleaned · SI decisions + AI suggestions`}</p></article>
+      <article><span>Inspection report results</span><strong>{covLoading ? 'Loading...' : data.reduce((n,d) => n+d.cleaned.cleaned+d.cleaned.notCleaned,0)}<small> assessed reports</small></strong><p>{covLoading ? 'Reading report results' : `${data.reduce((n,d) => n+d.cleaned.cleaned,0)} clean / ${data.reduce((n,d) => n+d.cleaned.notCleaned,0)} not clean`}</p></article>
       <article><span>Attendance availability</span><strong>{attLoading ? 'Loading...' : attendance.status === 'error' ? 'Unavailable' : `${data.filter(d => d.att?.score != null).length} / ${data.length}`}</strong><p>{attendance.status === 'no_data' ? 'No upload for the selected dates' : 'Officers matched to attendance records'}</p></article>
     </div>
     <section className="workspace-panel daroga-performance-tabs">
     <div className="workspace-panel-heading"><div><span className="workspace-eyebrow">DAROGA</span><h2>Team performance</h2><p className="officer-table-hint">Select an officer to explore their score breakdown</p></div>
       <div className="view-switch no-print" role="tablist" aria-label="Daroga performance parameter">{DAROGA_TABS.map(([id, label]) => <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'active' : ''} onClick={() => onTab(id)}>{label}</button>)}</div></div>
+    <p className="daroga-score-intro">Overall score combines <b>inspection targets (40%)</b>, <b>cleanliness (40%)</b> and <b>attendance (20%)</b>. Cleanliness is the share of reports found clean, using SI decisions or AI suggestions while SI review is pending.</p>
     <details className="officer-score-guide"><summary>How this score is calculated</summary><p className="score-context-note">{note[tab]}{tab === 'attendance' && ['ready','no_data'].includes(attendance.status) ? ` Attendance for ${attendance.period || 'the selected dates'}. Matched ${data.filter(d => d.att).length} of ${data.length} Darogas from ${attendance.rows.length} attendance rows.` : ''}{attendance.status === 'no_data' ? ' No attendance uploaded for the selected dates. Attendance contributes no marks; the overall uses the remaining assessed parameters.' : attendance.status === 'error' ? ' Attendance unavailable; it contributes no marks to the overall.' : ''}</p></details>
     {attendance.status === 'no_data' && <div className="officer-attendance-notice" role="status"><i/>No attendance uploaded for these dates. No attendance marks awarded.</div>}
     {attendance.status === 'error' && <div className="officer-attendance-notice" role="status">Attendance could not be loaded. No attendance marks awarded.</div>}
@@ -90,13 +91,21 @@ export function DarogaPerformanceTabs({ city, module, rows, tab, onTab, rawStats
     </tbody></table></div>
     {!data.length && <p className="analytics-empty">No Darogas match this selection.</p>}
     <Pagination {...paging} noun="Darogas" />
-    <Drawer isOpen={Boolean(selected)} onClose={() => setSelectedId('')} title={selected?.user.name || 'Daroga performance'} subtitle="Daroga" width="4xl">{selected && <>
-      <div className="analytics-kpis" style={{ marginBottom: 16 }}>
-        {([['Overall', selected.overall.score], ['Inspection (40%)', selected.inspection], ['Cleaned (40%)', selected.cleaned.score], ['Attendance (20%)', selected.att?.score ?? null]] as [string, number | null][]).map(([l, v]) => <article key={l}><span>{l}</span><strong>{l === 'Attendance (20%)' && v == null ? attendanceLabel : l === 'Overall' && (covLoading || attLoading) ? 'Loading...' : pct(v)}</strong></article>)}
+    <Drawer isOpen={Boolean(selected)} onClose={() => setSelectedId('')} title={selected?.user.name || 'Daroga performance'} subtitle="Daroga performance breakdown" width="4xl">{selected && <div className="daroga-detail">
+      <section className="daroga-overall-card" aria-label="Overall performance">
+        <div><span>Overall performance</span><strong>{covLoading || attLoading ? 'Loading...' : pct(selected.overall.score)}</strong></div>
+        <p>{module === 'ALL' ? 'All modules' : module} / {from} to {to} / IST<br/>Combined score from the three parts below. Missing scores are excluded and the remaining weights are adjusted.</p>
+      </section>
+      <div className="daroga-score-parts">
+        <article><span>Inspection target <small>40% weight</small></span><strong>{pct(selected.inspection)}</strong><p>{selected.stat?.completed ?? 'Unavailable'} credited / {selected.stat?.required ?? 'Unavailable'} target</p></article>
+        <article><span>Cleanliness <small>40% weight</small></span><strong>{covLoading ? 'Loading...' : pct(selected.cleaned.score)}</strong><p>{covLoading ? 'Reading report results' : `${selected.cleaned.cleaned} clean / ${selected.cleaned.notCleaned} not clean reports`}</p></article>
+        <article><span>Attendance <small>20% weight</small></span><strong>{selected.att?.score != null ? pct(selected.att.score) : attendanceLabel}</strong><p>{selected.att ? `${selected.att.presentDays} present / ${selected.att.selectedDays} selected days` : attendance.status === 'ready' ? attendanceGap(selected.user, attendance.rows) : 'No attendance score available'}</p></article>
       </div>
-      <p className="score-context-note" style={{ marginBottom: 8 }}><b>Aadhaar:</b> {selected.user.aadhaar ? selected.user.aadhaar.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 ') : 'Not recorded'}{selected.user.employeeId ? <> · <b>Employee ID:</b> {selected.user.employeeId}</> : null}</p>
-      <p className="score-context-note" style={{ marginBottom: 16 }}>Cleaned {selected.cleaned.cleaned} · Not cleaned {selected.cleaned.notCleaned} ({selected.cleaned.siDecided} by SI decision, {selected.cleaned.aiSuggested} by AI suggestion, {selected.cleaned.unassessed} not assessable). Attendance: {selected.att ? `${selected.att.presentDays} present / ${selected.att.selectedDays} selected days; ${selected.att.recordedDays} recorded, ${selected.att.absentDays} absent, ${selected.att.missingDays} missing` : attendance.status === 'ready' ? attendanceGap(selected.user, attendance.rows) : attendanceLabel}.</p>
-      <OfficerPerformanceDetail key={selected.user.id + module} user={selected.user} raw={rawStats?.[selected.user.id]} role="SUPERVISOR" module={module} wards={wards} period={matrixStore.getDateRange()} />
-    </>}</Drawer>
+      <details className="daroga-report-explanation"><summary>How report results affect cleanliness</summary><p>Clean reports / (clean + not clean reports) x 100. The SI decision is used first. If SI review is pending, the saved AI suggestion is used.</p><p>{covLoading ? 'Reading report results...' : `${selected.cleaned.siDecided} reports use SI decisions / ${selected.cleaned.aiSuggested} use AI suggestions / ${selected.cleaned.unassessed} have no assessable result and are excluded.`}</p></details>
+      <details className="daroga-report-explanation"><summary>Employee identifiers</summary><p><b>Aadhaar:</b> {selected.user.aadhaar ? selected.user.aadhaar.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 ') : 'Not recorded'}{selected.user.employeeId ? <> / <b>Employee ID:</b> {selected.user.employeeId}</> : null}</p></details>
+      <section className="daroga-inspection-detail"><header><h3>Inspection target details</h3><p>The calculation and module cards below explain the inspection part only. Changing the module here does not change the overall summary above.</p></header>
+        <OfficerPerformanceDetail key={selected.user.id + module} user={selected.user} raw={rawStats?.[selected.user.id]} role="SUPERVISOR" module={module} wards={wards} period={matrixStore.getDateRange()} hideProfileScore />
+      </section>
+    </div>}</Drawer>
   </section></section>;
 }
