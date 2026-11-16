@@ -308,3 +308,26 @@
 .inspection-module-cards .inspection-card-status{align-content:start;min-height:96px}
 .inspection-module-cards .module-ai-strip{margin-top:auto;min-height:78px;align-content:center}
 .inspection-module-cards .module-ai-strip+.module-pending{margin-top:10px}
+
+/* Zone cards (zc-) */
+.zone-overview-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important;gap:10px!important}
+.zone-overview-card.zc{gap:12px;padding:12px;border-radius:14px;min-width:0}
+.zc-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.zc-head b{display:inline-flex;align-items:center;gap:5px;font-size:14px;white-space:nowrap;font-weight:700;color:var(--ink)}
+.zc-head span{font-size:10.5px;font-weight:600;color:var(--muted);padding:2px 7px;white-space:nowrap;border-radius:999px;background:var(--surface-soft)}
+.zc-progress{display:grid;gap:6px}
+.zc-progress>div:first-child{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.zc-progress>div:first-child span{font-size:12px;font-weight:600;color:var(--muted)}
+.zc-progress strong{font-size:22px;font-weight:800;color:var(--zc,#2a78d6);font-variant-numeric:tabular-nums}
+.zc-bar{height:8px;border-radius:999px;background:var(--viz-track,#edf2f5);overflow:hidden}
+.zc-bar i{display:block;height:100%;border-radius:999px;background:var(--zc,#2a78d6);transition:width .4s}
+.zc-progress small{font-size:11.5px;color:var(--muted)}
+.zc[data-state=met]{--zc:#0ca30c}.zc[data-state=mid]{--zc:#2a78d6}.zc[data-state=low]{--zc:#e0702c}.zc[data-state=none]{--zc:#a9b6c0}
+.zc-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin:0;border-radius:10px;overflow:hidden;background:var(--line);border:1px solid var(--line)}
+.zc-grid>div{display:grid;gap:2px;padding:8px 9px;align-content:start;background:var(--surface)}
+.zc-grid dt{font-size:11px;font-weight:600;color:var(--muted)}
+.zc-grid dd{margin:0;font-size:15px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.zc-grid>div[data-met=true] dd{color:#0ca30c;font-size:14px}
+.zc-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 8px;font-size:11px;color:var(--muted)}
+.zc-foot b{color:var(--ink);font-variant-numeric:tabular-nums}
+.zc-details{display:inline-flex;align-items:center;font-weight:700;color:var(--di-blue)}

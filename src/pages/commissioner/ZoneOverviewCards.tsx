@@ -1,7 +1,7 @@
 import React from 'react';
 import {ChevronRight,Layers,MapPin} from 'lucide-react';
 import {useVisual} from '../../services/vizMode';
-import {ProgressMeter, ZoneColumns} from '../../components/analytics/VisualCharts';
+import {ZoneColumns} from '../../components/analytics/VisualCharts';
 import type {InspectionCoverage} from '../../services/inspectionCoverage';
 import {coverageCounts} from '../../services/inspectionCoverage';
 import {cleanlinessStats} from '../../services/cleanliness';
@@ -32,14 +32,23 @@ export function ZoneOverviewCards({cards,loading,onSelect,detail}:{cards:ZoneOve
   return <section className="home-section zone-overview-cards">
     <div className="home-section-heading"><div><h2>Zone performance & ward inspection overview</h2></div><span className="zone-overview-count"><Layers size={14}/>{cards.length} {cards.length===1?'Zone':'Zones'} Active</span></div>
     {visual&&!loading&&cards.length>1&&<ZoneColumns zones={[...cards].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(c=>({id:c.id,name:c.name,target:c.target,received:c.completed,percent:c.percent}))} onSelect={id=>{const c=cards.find(x=>x.id===id);if(c)select(c);else onSelect(id);}}/>}
-    <div className="zone-overview-grid">{[...cards].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(c=><button key={c.id} className="zone-overview-card" onClick={()=>select(c)} aria-label={detail?`Open details for ${c.name}`:`Open inspection performance for ${c.name}`}>
-      <div className="zone-overview-top"><span className="zone-overview-name"><MapPin size={12}/>{c.name}</span><small>{c.wards} WARDS</small></div>
-      <span className="zone-overview-full-target" title="Registered assets multiplied by selected days; one report per asset per day."><span>Total inspections required<small>At 100% target</small></span><b data-zone-full-target={c.id}>{loading?'\u2026':fmt(c.fullTarget)}</b></span>
-      <div className="zone-overview-stats"><div><b>{loading?'…':fmt(c.totalAssets)}</b><small>Assets</small></div><div><b>{loading?'…':fmt(c.target)}</b><small>Target</small></div><div><b>{loading?'…':fmt(c.completed)}</b><small>Reports received</small></div></div>
-      <div className="zone-overview-progress"><span>Target progress</span><strong>{loading?'…':c.percent==null?'—':`${fmt(c.percent,1)}%`}</strong></div>
-      <ProgressMeter visual={visual} variant="ring" className="zone-overview-meter" percent={c.percent} label={`${c.name} target progress`}/>
-      <div className="zone-overview-foot"><span className="zone-overview-pending">{loading?'…':fmt(c.pending)} Reports needed</span><span className="zone-overview-details">Details<ChevronRight size={13}/></span></div>
-    </button>)}</div>
+    <div className="zone-overview-grid">{[...cards].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(c=>{
+      const state=c.percent==null?'none':c.percent>=100?'met':c.percent>=40?'mid':'low';
+      return <button key={c.id} className="zone-overview-card zc" data-state={state} onClick={()=>select(c)} aria-label={detail?`Open details for ${c.name}`:`Open inspection performance for ${c.name}`}>
+        <div className="zc-head"><b><MapPin size={13}/>{c.name}</b><span>{c.wards} {c.wards===1?'ward':'wards'}</span></div>
+        <div className="zc-progress">
+          <div><span>Target progress</span><strong>{loading?'…':c.percent==null?'—':`${fmt(c.percent,1)}%`}</strong></div>
+          <div className="zc-bar" role="img" aria-label={`${c.name} target progress`}><i style={{width:`${loading?0:Math.min(100,c.percent??0)}%`}}/></div>
+          <small>{loading?'':`${fmt(c.completed)} of ${fmt(c.target)} target reports received`}</small>
+        </div>
+        <dl className="zc-grid">
+          <div><dt>Assets</dt><dd>{loading?'…':fmt(c.totalAssets)}</dd></div>
+          <div><dt>Inspection target</dt><dd>{loading?'…':fmt(c.target)}</dd></div>
+          <div><dt>Reports received</dt><dd>{loading?'…':fmt(c.completed)}</dd></div>
+          <div data-met={!loading&&c.pending===0}><dt>Reports still needed</dt><dd>{loading?'…':c.pending===0?'Target met':fmt(c.pending)}</dd></div>
+        </dl>
+        <div className="zc-foot"><span title="Registered assets multiplied by selected days; one report per asset per day.">Full target (100%): <b data-zone-full-target={c.id}>{loading?'…':fmt(c.fullTarget)}</b></span><span className="zc-details">Details<ChevronRight size={13}/></span></div>
+      </button>;})}</div>
     {!cards.length&&<div className="home-empty">No zones in the selected scope.</div>}
   </section>;
 }
