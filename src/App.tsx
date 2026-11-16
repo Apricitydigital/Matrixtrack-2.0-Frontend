@@ -175,7 +175,7 @@ export function Dashboard({ initialPage }: { initialPage?: string } = {}) {
   }, [activePageId, matrixStore.loadRevision,needsCitySelection]);
   // These pages own their loading/error states and can start their API reads
   // while the shared geography/personnel directories are still loading.
-  const independentUlbPage=currentRole==='ULB_OFFICER'&&['ulb_dashboard','ulb_map','ulb_attendance','ulb_user_perf','ulb_ward_ranking','prod_plant'].includes(activePageId);
+  const independentUlbPage=currentRole==='ULB_OFFICER'&&['ulb_dashboard','ulb_map','ulb_attendance','ulb_user_perf','ulb_ward_ranking','ulb_zone_ranking','prod_plant'].includes(activePageId);
   const independentCityAdminPage=currentRole==='CITY_ADMIN'&&['ca_dashboard','ca_map','ca_targets','ca_attendance','ca_user_perf','ca_ward_ranking','ca_iec_oversight','prod_plant'].includes(activePageId);
   const independentSuperPage=currentRole==='HMS_SUPER_ADMIN'&&['sa_dashboard','sa_users','sa_city_admins','sa_audit_logs','ca_dashboard'].includes(activePageId);
   const pageLoading = !independentSuperPage&&!independentUlbPage&&!independentCityAdminPage&&pageDatasets(activePageId,currentRole).some(key => {
@@ -283,11 +283,12 @@ export function Dashboard({ initialPage }: { initialPage?: string } = {}) {
       ulb_attendance: 'Attendance',
       ulb_inspection_perf: 'Inspection Performance',ulb_user_perf:'User Performance',
       ulb_ward_ranking: 'Ward Ranking',
+      ulb_zone_ranking: 'Zone Ranking',
 
       comm_dashboard: 'City Overview',
       comm_map: 'City Operations Map',
       comm_chat_history: 'Chat history',
-      comm_zone_ward: 'Zone Details',
+      comm_zone_ward: 'Zone Ranking',
       comm_iec_oversight: 'IEC Cleanliness Oversight',
       comm_ward_ranking: 'Ward Ranking',
       comm_attendance: 'Attendance',
@@ -311,7 +312,7 @@ export function Dashboard({ initialPage }: { initialPage?: string } = {}) {
 
   const overviewRole: RoleType = activePageId === 'ca_dashboard' ? 'CITY_ADMIN' : currentRole;
   const navigate = (pageId: string) => {
-    if(currentRole==='ULB_OFFICER'){pageId=({comm_dashboard:'ulb_dashboard',comm_map:'ulb_map',comm_zone_ward:'ulb_dashboard',comm_attendance:'ulb_attendance',comm_plant:'prod_plant',comm_user_perf:'ulb_user_perf',comm_ward_ranking:'ulb_ward_ranking',comm_inspection_perf:'ulb_inspection_perf',comm_iec_oversight:'ulb_iec_issues',ulb_reports:'ulb_inspection_perf'} as Record<string,string>)[pageId]||pageId;}
+    if(currentRole==='ULB_OFFICER'){pageId=({comm_dashboard:'ulb_dashboard',comm_map:'ulb_map',comm_zone_ward:'ulb_zone_ranking',comm_attendance:'ulb_attendance',comm_plant:'prod_plant',comm_user_perf:'ulb_user_perf',comm_ward_ranking:'ulb_ward_ranking',comm_inspection_perf:'ulb_inspection_perf',comm_iec_oversight:'ulb_iec_issues',ulb_reports:'ulb_inspection_perf'} as Record<string,string>)[pageId]||pageId;}
     if (currentRole === 'CITY_ADMIN' || activePageId.startsWith('ca_')) {
       pageId = ({ comm_dashboard: 'ca_dashboard', comm_map: 'ca_map', comm_zone_ward: 'ca_zones_wards', comm_attendance: 'ca_attendance', comm_plant: 'prod_plant', comm_user_perf: 'ca_user_perf', comm_ward_ranking: 'ca_ward_ranking', comm_inspection_perf: 'ca_inspection_perf', comm_iec_oversight: 'ca_iec_oversight', comm_exec_summary: 'ca_exec_summary' } as Record<string, string>)[pageId] || pageId;
     }
@@ -524,7 +525,7 @@ export function Dashboard({ initialPage }: { initialPage?: string } = {}) {
           {activePageId==='comm_dashboard' && <CommissionerHome city={effectiveCity} zones={zones} wards={wards} reports={reports} users={users} currentUser={currentUser} onNavigate={navigate} onSelectReport={setInspectedReportId} onInspect={(moduleId='all',status='all',zone='',ward='')=>{setReportIntent(inspectionDrillFilters(zone,ward,moduleId,status));navigate('comm_inspection_perf');}} noticeRequest={noticeRequest} onNoticeCount={setNoticeCount} onNoticeHandled={()=>setNoticeRequest(0)}/>}
           {activePageId === 'comm_inspection_perf' && <CommissionerWorkspace city={effectiveCity} reports={reports} zones={zones} wards={wards} users={users} onSelectReport={setInspectedReportId} onNavigate={navigate} registryOnly initialFilters={reportIntent}/>}
 
-          {activePageId === 'comm_zone_ward' && (
+          {['comm_zone_ward','ulb_zone_ranking'].includes(activePageId) && (
             <ZoneWardDetails
               city={effectiveCity}
               zones={zones}
