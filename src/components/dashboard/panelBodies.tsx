@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import type { InspectionCoverage } from '../../services/inspectionCoverage';
+import type { InspectionCoverage, InspectionVisit } from '../../services/inspectionCoverage';
 import { inspectionStatus } from '../../services/inspectionStatus';
 import { coverageCounts } from '../../services/inspectionCoverage';
-import { aiAnalysis, cleanlinessStats, notCleanLocations, pendingLocations, type CleanStats } from '../../services/cleanliness';
+import { aiAnalysis, cleanlinessStats, notCleanLocations, pendingLocations, visitCleanliness, type CleanStats } from '../../services/cleanliness';
 import { MODULE_LABELS } from '../../services/presentation';
 import type { OperationalModuleId } from '../../types';
 import { CLEAN_COLORS, PanelActions, PanelSection, PanelStats, PanelTable, SplitBar, fmtNum, fmtPct } from './DetailPanel';
@@ -14,12 +14,14 @@ const nameOf = (rows: Named[], id: string, fallback: string) => rows.find(r => r
 const inScope = (scope: Scope) => (r: { module: string; zoneId: string; wardId: string }) => (!scope.module || r.module === scope.module) && (!scope.zone || r.zoneId === scope.zone) && (!scope.ward || r.wardId === scope.ward);
 
 export function CleanSplit({ stats }: { stats: CleanStats }) {
-  return <SplitBar label="Cleanliness" parts={[{ label: 'Clean', value: stats.clean, color: CLEAN_COLORS.clean }, { label: 'Not clean', value: stats.notClean, color: CLEAN_COLORS.notClean }, { label: 'Not assessed', value: stats.unassessed, color: CLEAN_COLORS.unassessed }]} />;
+  return <SplitBar label="Cleanliness" parts={[{ label: 'Clean', value: stats.clean, color: CLEAN_COLORS.clean }, { label: 'Not clean', value: stats.notClean, color: CLEAN_COLORS.notClean }, { label: 'AI analysing', value: stats.unassessed, color: CLEAN_COLORS.unassessed }]} />;
 }
 
 /** Cleanliness of one scope: SI and AI split, AI agreement and the locations found not clean. */
-export function CleanlinessDetail({ data, scope, wards, onOpen }: { data: InspectionCoverage; scope: Scope; wards: Named[]; onOpen?: OpenReports }) {
+export function CleanlinessDetail({ data, scope, wards, onOpen, onViewReport }: { data: InspectionCoverage; scope: Scope; wards: Named[]; onOpen?: OpenReports; onViewReport?: (visit: InspectionVisit) => void }) {
   const visits = data.visits.filter(inScope(scope)), stats = cleanlinessStats(visits), ai = aiAnalysis(visits), dirty = notCleanLocations(data, visits, 12);
+  const latest = new Map<string, InspectionVisit>();
+  for (const v of visits) { if (visitCleanliness(v).verdict !== 'not_clean') continue; const k = `${v.module}:${v.assetId || v.id}`, cur = latest.get(k); if (!cur || (v.submittedAt || '') > (cur.submittedAt || '')) latest.set(k, v); }
   return <>
     <PanelStats items={[
       { label: 'Cleanliness', value: fmtPct(stats.percent), note: 'Clean share of assessed inspections', tone: stats.percent == null ? 'neutral' : stats.percent >= 80 ? 'green' : stats.percent >= 60 ? 'amber' : 'red' },
@@ -33,12 +35,12 @@ export function CleanlinessDetail({ data, scope, wards, onOpen }: { data: Inspec
         { label: 'SI cleanliness', value: fmtPct(stats.siPercent), note: `${fmtNum(stats.siClean + stats.siNotClean)} SI decisions` },
         { label: 'AI suggestions used', value: fmtNum(stats.aiClean + stats.aiNotClean), note: 'Reports awaiting SI review' },
         { label: 'AI agrees with SI', value: fmtPct(ai.agreement), note: ai.compared ? `${fmtNum(ai.agreed)} of ${fmtNum(ai.compared)} compared` : 'No decided reports with AI analysis' },
-        { label: 'Not assessed', value: fmtNum(stats.unassessed), note: 'No SI decision and no usable AI result' },
+        { label: 'AI analysing', value: fmtNum(stats.unassessed), note: 'AI needs some time to assess' },
       ]} />
     </PanelSection>
     <PanelSection title="Locations found not clean" note={dirty.length ? 'Most frequent first.' : undefined}>
-      <PanelTable head={['Location', 'Module', 'Ward', 'Times not clean', 'Basis']} empty="No inspection in this selection was found not clean."
-        rows={dirty.map(r => ({ key: r.key, cells: [r.name, MODULE_LABELS[r.module] || r.module, nameOf(wards, r.wardId, 'Not recorded'), fmtNum(r.count), r.source === 'si' ? 'SI decision' : 'AI suggestion'] }))} />
+      <PanelTable head={onViewReport ? ['Location', 'Module', 'Ward', 'Times not clean', 'Basis', 'Report'] : ['Location', 'Module', 'Ward', 'Times not clean', 'Basis']} empty="No inspection in this selection was found not clean."
+        rows={dirty.map(r => { const v = latest.get(r.key); return { key: r.key, cells: [r.name, MODULE_LABELS[r.module] || r.module, nameOf(wards, r.wardId, 'Not recorded'), fmtNum(r.count), r.source === 'si' ? 'SI decision' : 'AI suggestion', ...(onViewReport ? [v ? <button type="button" className="dp-more" onClick={() => onViewReport(v)}>View report</button> : 'N/A'] : [])] }; })} />
     </PanelSection>
     {onOpen && <PanelActions actions={[{ label: 'Open not-cleaned reports', primary: true, onClick: () => onOpen(scope, 'rejected') }, { label: 'Open all reports', onClick: () => onOpen(scope) }]} />}
   </>;

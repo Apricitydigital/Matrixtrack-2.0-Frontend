@@ -8,7 +8,7 @@ const {IntelligenceSummary,IntelligenceSuggestion}=require('../src/components/re
 const raw=(id,status,outcome,confidence=.88)=>({id,status,createdAt:'2026-11-04T05:00:00Z',autoQcResult:{decision:'APPROVED',cleanliness:{outcome,confidence,reasons:['Visible waste at the location'],reasonsHi:['यहाँ कचरा दिखाई दे रहा है']}}});
 test('SI decisions stay official; only human-pending records enter the separate AI counts',()=>{
  const rows=[raw('1','SUBMITTED','CLEAN'),raw('2','SUBMITTED','NOT_CLEAN'),raw('3','APPROVED','CLEAN'),raw('4','REJECTED','NOT_CLEAN'),raw('5','DRAFT','CLEAN'),{id:'6',status:'PENDING_QC'},{...raw('7','SUBMITTED','NOT_CLEAN'),qcDecision:'REJECTED'}, {id:'8',status:'SUBMITTED',autoQcResult:{decision:'APPROVED',checks:[{result:'MATCH'}]}}];
- assert.deepEqual(intelligenceCounts(rows),{CLEAN:1,NOT_CLEAN:1,UNASSESSABLE:1,AWAITING_AI:1});
+ assert.deepEqual(intelligenceCounts(rows),{CLEAN:1,NOT_CLEAN:2,UNASSESSABLE:0,AWAITING_AI:1});
  const report=mapReport(rows[1],'sweeping','city',[]);assert.equal(report.status,'pending_review');assert.equal(report.intelligenceSuggestion.outcome,'NOT_CLEAN');assert.equal(report.intelligenceSuggestion.confidencePercent,88);
  assert.equal(matchesFilters(report,{...emptyFilters(),status:intelligenceFilter('NOT_CLEAN')},[]),true);
  assert.equal(matchesFilters(report,{...emptyFilters(),status:'rejected'},[]),false);
@@ -42,4 +42,21 @@ test('the ULB operations dashboard renders intelligence counts alongside the off
   assert.match(html,/data-outcome="NOT_CLEAN"[^]*?<strong>45<\/strong>/);
   assert.match(html,/Intelligence suggested clean/);assert.match(html,/Intelligence suggested not cleaned/);
  } finally {coverageHook.useInspectionCoverage=originalCoverage;commissioner.useCityPulse=originalPulse;}
+});
+
+test('AI gets sixty minutes from submission, including old drafts and compact timestamp metadata',()=>{
+ const {intelligenceSuggestion:suggest}=require('../src/services/intelligenceSuggestion');
+ const originalNow=Date.now,now=Date.parse('2026-11-16T12:00:00Z');Date.now=()=>now;
+ const old=new Date(now-86400000).toISOString(),fresh=new Date(now-30*60000).toISOString();
+ try{
+  for(const submission of [{submittedAt:fresh},{payload:{lastSubmittedAt:fresh}},{payload:{submittedAt:fresh}},{aiSubmittedAt:fresh,submittedAt:old},{submittedAt:'invalid',payload:{lastSubmittedAt:fresh}}]){
+   assert.equal(suggest({status:'SUBMITTED',createdAt:old,...submission}).outcome,'AWAITING_AI');
+  }
+  assert.equal(suggest({status:'SUBMITTED',createdAt:old,submittedAt:new Date(now-60*60000+1).toISOString()}).outcome,'AWAITING_AI');
+  assert.equal(suggest({status:'SUBMITTED',createdAt:old,submittedAt:new Date(now-60*60000).toISOString()}).outcome,'NOT_CLEAN');
+  assert.equal(suggest({status:'DRAFT',createdAt:old}).outcome,'AWAITING_AI');
+  assert.equal(suggest({status:'SUBMITTED',workspaceStatus:'DRAFT',createdAt:old}).outcome,'AWAITING_AI');
+  assert.equal(suggest({status:'SUBMITTED',createdAt:old}).outcome,'NOT_CLEAN');
+  assert.equal(suggest({status:'SUBMITTED',submittedAt:'invalid'}).outcome,'AWAITING_AI');
+ }finally{Date.now=originalNow;}
 });
