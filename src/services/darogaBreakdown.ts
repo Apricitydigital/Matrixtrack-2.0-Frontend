@@ -31,7 +31,7 @@ export function darogaCleaned(visits: any[], darogaId: string, module = 'ALL'): 
   return out;
 }
 
-export interface AttendanceStats { presentDays: number; recordedDays: number; absentDays: number; score: number | null }
+export interface AttendanceStats { presentDays: number; recordedDays: number; selectedDays: number; missingDays: number; absentDays: number; score: number | null }
 
 const loose = (v: any) => String(v || '').toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\b(mr|mrs|ms|shri|smt|sh|dr)\b/g, ' ').split(/\s+/).filter(Boolean).sort().join(' ');
 const last8 = (v: any) => String(v || '').replace(/\D/g, '').slice(-8);
@@ -42,7 +42,7 @@ const digits = (v: any) => String(v || '').replace(/\D/g, '').replace(/^0+/, '')
  * phone or ID digits, exact name, then name ignoring order, titles and punctuation. A step is used only
  * when it points at exactly one attendance row, so two people are never merged.
  */
-export function darogaAttendance(user: { id?: string; name: string; employeeId?: string; phone?: string; aadhaar?: string }, _daroga: { name: string }[], rows: any[]): AttendanceStats | null {
+export function darogaAttendance(user: { id?: string; name: string; employeeId?: string; phone?: string; aadhaar?: string }, _daroga: { name: string }[], rows: any[], period: { from: string; to: string }): AttendanceStats | null {
   const steps: ((r: any) => boolean)[] = [
     r => !!user.id && r.matrixTrackUserId === user.id,
     r => { const u = last8(user.aadhaar), a = last8(r.attendanceId); return u.length === 8 && a.length === 8 && u === a; },
@@ -54,8 +54,15 @@ export function darogaAttendance(user: { id?: string; name: string; employeeId?:
   let row: any[] = [];
   for (const step of steps) { const found = rows.filter(step); if (found.length === 1) { row = found; break; } }
   if (row.length !== 1) return null;
-  const r = row[0], recorded = Number(r.totalDays), present = Number(r.presentDays);
-  return { presentDays: present, recordedDays: recorded, absentDays: Number(r.absentDays) || 0, score: recorded > 0 ? present / recorded * 100 : null };
+  // Date-only UTC arithmetic counts inclusive IST calendar dates without timezone offsets.
+  const start = Date.parse(`${period.from}T00:00:00Z`), end = Date.parse(`${period.to}T00:00:00Z`);
+  const selectedDays = Math.round((end - start) / 86400000) + 1;
+  const r = row[0], recorded = Number(r.totalDays), present = Number(r.presentDays), absent = Number(r.absentDays) || 0;
+  if (!Number.isInteger(selectedDays) || selectedDays <= 0 ||
+      ![recorded, present, absent].every(n => Number.isInteger(n) && n >= 0) ||
+      recorded > selectedDays || present + absent > recorded) return null;
+  return { presentDays: present, recordedDays: recorded, selectedDays, missingDays: selectedDays - recorded,
+    absentDays: absent, score: recorded > 0 ? present / selectedDays * 100 : null };
 }
 
 /** 40% inspection + 40% cleaned + 20% attendance; a part with no score is left out and the remaining weights are rescaled. */

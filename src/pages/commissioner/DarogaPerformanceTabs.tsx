@@ -36,11 +36,11 @@ export function DarogaPerformanceTabs({ city, module, rows, tab, onTab, rawStats
   const data = useMemo(() => {
     const people = rows.map(r => r.user);
     return rows.map(({ user, stat }) => {
-      const cleaned = darogaCleaned(coverage.data.visits, user.id, module), att = darogaAttendance(user, people, attendance.rows);
+      const cleaned = darogaCleaned(coverage.data.visits, user.id, module), att = darogaAttendance(user, people, attendance.rows, { from, to });
       const inspection = typeof stat?.performance === 'number' ? stat.performance : null;
       return { user, stat, cleaned, att, inspection, overall: darogaOverall({ inspection, cleaned: cleaned.score, attendance: att?.score ?? null }) };
     }).sort((a, b) => (b.overall.score ?? -1) - (a.overall.score ?? -1) || a.user.name.localeCompare(b.user.name));
-  }, [rows, coverage.data, attendance.rows, module]);
+  }, [rows, coverage.data, attendance.rows, module, from, to]);
   const paging = usePagination(data, tab + data.map(d => d.user.id).join(','));
   const selected = data.find(d => d.user.id === selectedId);
   const place = (u: User) => {
@@ -53,20 +53,20 @@ export function DarogaPerformanceTabs({ city, module, rows, tab, onTab, rawStats
   const head: Record<DarogaTab, string[]> = {
     overall: ['Overall score', 'Inspection (40%)', 'Cleaned (40%)', 'Attendance (20%)'],
     inspection: ['Score', 'Credited', 'Target'],
-    attendance: ['Score', 'Present days', 'Recorded days', 'Absent days'],
+    attendance: ['Score', 'Present days', 'Selected days', 'Recorded days', 'Absent days', 'Missing days'],
     cleaned: ['Score', 'Cleaned', 'Not cleaned', 'By SI decision', 'By AI suggestion', 'Not assessable']
   };
   const cells = (d: typeof data[number]): React.ReactNode[] => {
     const att = d.att, c = d.cleaned;
-    if (tab === 'overall') return [<Score key="o" value={d.overall.score} pending={covLoading || attLoading}/>, <Score key="i" value={d.inspection}/>, <Score key="c" value={c.score} pending={covLoading}/>, att?.score != null ? <Score key="a" value={att.score}/> : <span className="officer-data-label">{attendanceLabel}</span>];
+    if (tab === 'overall') return [<Score key="o" value={d.overall.score} pending={covLoading || attLoading}/>, <Score key="i" value={d.inspection}/>, <Score key="c" value={c.score} pending={covLoading}/>, att?.score != null ? <span key="a"><Score value={att.score}/><small className="officer-data-label">{att.presentDays} / {att.selectedDays} days; {att.missingDays} missing</small></span> : <span className="officer-data-label">{attendanceLabel}</span>];
     if (tab === 'inspection') return [<Score key="s" value={d.inspection}/>, d.stat?.completed ?? '—', d.stat?.required ?? '—'];
-    if (tab === 'attendance') return att ? [<Score key="s" value={att.score}/>, att.presentDays, att.recordedDays, att.absentDays] : [<b key="s">{attLoading ? '…' : 'Not matched'}</b>, <span key="g" title={attendanceGap(d.user, attendance.rows)}>—</span>, '—', '—'];
+    if (tab === 'attendance') return att ? [<Score key="s" value={att.score}/>, att.presentDays, att.selectedDays, att.recordedDays, att.absentDays, att.missingDays] : [<b key="s">{attLoading ? '…' : 'Not matched'}</b>, <span key="g" title={attendanceGap(d.user, attendance.rows)}>—</span>, ...head.attendance.slice(2).map(() => '—')];
     return covLoading ? [<b key="s">…</b>, '…', '…', '…', '…', '…'] : [<Score key="s" value={c.score}/>, c.cleaned, c.notCleaned, c.siDecided, c.aiSuggested, c.unassessed];
   };
   const note: Record<DarogaTab, string> = {
     overall: `Overall = Inspection ${DAROGA_WEIGHTS.inspection}% + Cleaned ${DAROGA_WEIGHTS.cleaned}% + Attendance ${DAROGA_WEIGHTS.attendance}%. A part with no score is left out and the remaining weights are rescaled.`,
     inspection: 'Credited inspections ÷ assigned inspection target, capped at 100%.',
-    attendance: 'Present days ÷ days with an uploaded attendance record in the selected dates. Matched by the system link (Aadhaar or name), employee ID or phone, then name; unmatched users show Not matched.',
+    attendance: 'Present days ÷ all calendar days in the selected dates (inclusive). Missing records earn no attendance credit and are shown separately from recorded absences. Matched by the system link (Aadhaar or name), employee ID or phone, then name; unmatched users show Not matched.',
     cleaned: 'Cleaned ÷ (Cleaned + Not cleaned), for the selected module. Uses the saved SI decision (Approved = cleaned; Rejected = not cleaned), even after corrective action. Reports without an SI decision use the AI suggestion. Reports without an assessable result are excluded.'
   };
   const assessed = data.filter(d => d.overall.score != null);
@@ -95,7 +95,7 @@ export function DarogaPerformanceTabs({ city, module, rows, tab, onTab, rawStats
         {([['Overall', selected.overall.score], ['Inspection (40%)', selected.inspection], ['Cleaned (40%)', selected.cleaned.score], ['Attendance (20%)', selected.att?.score ?? null]] as [string, number | null][]).map(([l, v]) => <article key={l}><span>{l}</span><strong>{l === 'Attendance (20%)' && v == null ? attendanceLabel : l === 'Overall' && (covLoading || attLoading) ? 'Loading...' : pct(v)}</strong></article>)}
       </div>
       <p className="score-context-note" style={{ marginBottom: 8 }}><b>Aadhaar:</b> {selected.user.aadhaar ? selected.user.aadhaar.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 ') : 'Not recorded'}{selected.user.employeeId ? <> · <b>Employee ID:</b> {selected.user.employeeId}</> : null}</p>
-      <p className="score-context-note" style={{ marginBottom: 16 }}>Cleaned {selected.cleaned.cleaned} · Not cleaned {selected.cleaned.notCleaned} ({selected.cleaned.siDecided} by SI decision, {selected.cleaned.aiSuggested} by AI suggestion, {selected.cleaned.unassessed} not assessable). Attendance: {selected.att ? `${selected.att.presentDays} present of ${selected.att.recordedDays} recorded days` : attendance.status === 'ready' ? attendanceGap(selected.user, attendance.rows) : attendanceLabel}.</p>
+      <p className="score-context-note" style={{ marginBottom: 16 }}>Cleaned {selected.cleaned.cleaned} · Not cleaned {selected.cleaned.notCleaned} ({selected.cleaned.siDecided} by SI decision, {selected.cleaned.aiSuggested} by AI suggestion, {selected.cleaned.unassessed} not assessable). Attendance: {selected.att ? `${selected.att.presentDays} present / ${selected.att.selectedDays} selected days; ${selected.att.recordedDays} recorded, ${selected.att.absentDays} absent, ${selected.att.missingDays} missing` : attendance.status === 'ready' ? attendanceGap(selected.user, attendance.rows) : attendanceLabel}.</p>
       <OfficerPerformanceDetail key={selected.user.id + module} user={selected.user} raw={rawStats?.[selected.user.id]} role="SUPERVISOR" module={module} wards={wards} period={matrixStore.getDateRange()} />
     </>}</Drawer>
   </section></section>;
