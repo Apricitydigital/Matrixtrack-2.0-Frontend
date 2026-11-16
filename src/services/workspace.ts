@@ -1,4 +1,5 @@
 import type { AppStoreData } from './store';
+import { savedDateRange, saveDateRange } from './persistedFilters';
 import type { User, Area } from '../types';
 import { api, todayIST } from './api';
 import {concurrentReads} from './concurrentReads';
@@ -61,8 +62,9 @@ export class WorkspaceLoader {
   public states: Partial<Record<Dataset, CollectionState>> = {};
   public warnings: string[] = [];
   public summary: any = null;
-  public from = todayIST();
-  public to = todayIST();
+  // The last chosen dates are restored after a refresh.
+  public from = savedDateRange()?.from ?? todayIST();
+  public to = savedDateRange()?.to ?? todayIST();
   private data: AppStoreData;
   private user: User;
   private scopeId?: string;
@@ -79,7 +81,7 @@ export class WorkspaceLoader {
     this.states = {}; this.warnings = []; this.cursors.clear(); this.nodes = []; this.summary = null;
   }
   public changePeriod(from:string,to:string){
-    this.cancel();this.controller=new AbortController();this.from=from;this.to=to;
+    this.cancel();this.controller=new AbortController();this.from=from;this.to=to;saveDateRange(from,to);
     const dated:Dataset[]=['reports','attendance','iecIssues','auditLogs'];
     for(const key of dated)delete this.states[key];
     for(const [key,state] of Object.entries(this.states))if(state.status==='loading')delete this.states[key as Dataset];

@@ -1,4 +1,5 @@
 import {CommissionerToolbar} from '../../components/layout/CommissionerToolbar';
+import { usePersistedState } from '../../services/persistedFilters';
 import { PlantOverview } from './PlantOverview';
 import { InspectionReviewOverview } from './InspectionReviewOverview';
 import {WardReportProgress} from './WardReportProgress';
@@ -40,7 +41,8 @@ import { targetDelivery, targetReadState, reportTargetDelivery } from '../../ser
 interface Props {city:City;zones:Zone[];wards:Ward[];reports:OperationalReport[];users?:User[];currentUser:User;onNavigate:(page:string)=>void;onSelectReport:(id:string)=>void;onInspect:(module?:string|string[],status?:string,zone?:string|string[],ward?:string|string[])=>void;noticeRequest:number;onNoticeCount:(count:number)=>void;onNoticeHandled?:()=>void;}
 const format=(n:number|undefined|null,decimals=0)=>n==null?'N/A':n.toLocaleString('en-IN',{maximumFractionDigits:decimals});
 export function CommissionerHome({city,zones,wards,reports,users=[],currentUser,onNavigate,onSelectReport,onInspect:inspectReports,noticeRequest,onNoticeCount,onNoticeHandled}:Props) {
-  const [zoneIds,setZoneIds]=useState<string[]>([]),[wardIds,setWardIds]=useState<string[]>([]),[revision,setRevision]=useState(0),[briefing,setBriefing]=useState(false),[photo,setPhoto]=useState<{report:OperationalReport;index:number}|null>(null),[moduleIds,setModuleIds]=useState<string[]>([]);
+  const fk=(name:string)=>`home:${currentUser.id}:${city.id}:${name}`;
+  const [zoneIds,setZoneIds]=usePersistedState<string[]>(fk('zones'),[]),[wardIds,setWardIds]=usePersistedState<string[]>(fk('wards'),[]),[revision,setRevision]=useState(0),[briefing,setBriefing]=useState(false),[photo,setPhoto]=useState<{report:OperationalReport;index:number}|null>(null),[moduleIds,setModuleIds]=usePersistedState<string[]>(fk('modules'),[]);
   const visual=useVisual();
   const root=useRef<HTMLDivElement>(null),evidenceRef=useRef<HTMLDivElement>(null),autoOpened=useRef(false);const range=matrixStore.getDateRange();
   const [evidenceScope,setEvidenceScope]=useState(''),evidenceKey=JSON.stringify([city.id,range.from,range.to]);

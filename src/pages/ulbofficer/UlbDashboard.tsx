@@ -1,4 +1,5 @@
 import {CoveragePage} from '../../components/dashboard/CoveragePage';
+import { usePersistedState } from '../../services/persistedFilters';
 import { sortNewestFirst } from '../../services/sortReports';
 import {ulbReportRegister} from '../../services/ulbReportRegister';
 import {ulbTeamProgress} from '../../services/ulbTeamProgress';
@@ -41,7 +42,8 @@ import {CoverageDetail,type Scope} from '../../components/dashboard/panelBodies'
 interface Props {onInspectZone:(zone:string|string[],ward?:string|string[],module?:string,status?:string)=>void;city:City;zones:Zone[];wards:Ward[];currentUser:User;onNavigate:(id:string)=>void;onSelectReport:(id:string)=>void;noticeRequest:number;onNoticeCount:(count:number)=>void;onNoticeHandled:()=>void}
 const scopeNames=(rows:{id:string;name:string}[],single:string|undefined,ids:string[]|undefined,all:string)=>!single&&!ids?.length?all:rows.filter(row=>(!single||row.id===single)&&(!ids?.length||ids.includes(row.id))).map(row=>row.name).join(', ')||all;
 export function UlbDashboard({onInspectZone,city,zones,wards,currentUser,onNavigate,onSelectReport,noticeRequest,onNoticeCount,onNoticeHandled}:Props){
-  const [zoneIds,setZoneIds]=useState<string[]>([]),[wardIds,setWardIds]=useState<string[]>([]),[revision,setRevision]=useState(0),[briefing,setBriefing]=useState(false),[drill,setDrill]=useState<{kind:UlbDrill;scope:UlbScope}|null>(null),[opening,setOpening]=useState(''),[error,setError]=useState(''),[drillZones,setDrillZones]=useState<string[]>([]),[drillWards,setDrillWards]=useState<string[]>([]),[moduleIds,setModuleIds]=useState<string[]>([]),[targetModal,setTargetModal]=useState(false),[pctRules,setPctRules]=useState<Record<string,{targets:number;percentTargets:number;percents:number[]}|null>>({});
+  const fk=(name:string)=>`ulb:${currentUser.id}:${city.id}:${name}`;
+  const [zoneIds,setZoneIds]=usePersistedState<string[]>(fk('zones'),[]),[wardIds,setWardIds]=usePersistedState<string[]>(fk('wards'),[]),[revision,setRevision]=useState(0),[briefing,setBriefing]=useState(false),[drill,setDrill]=useState<{kind:UlbDrill;scope:UlbScope}|null>(null),[opening,setOpening]=useState(''),[error,setError]=useState(''),[drillZones,setDrillZones]=useState<string[]>([]),[drillWards,setDrillWards]=useState<string[]>([]),[moduleIds,setModuleIds]=useState<string[]>([]),[targetModal,setTargetModal]=useState(false),[pctRules,setPctRules]=useState<Record<string,{targets:number;percentTargets:number;percents:number[]}|null>>({});
   const [drillModules,setDrillModules]=useState<string[]>([]);
   const {api:panel,panel:panelContent}=usePanelState();
   const [coverageView,setCoverageView]=useState<Scope|null>(null);
