@@ -9,7 +9,7 @@ export function siPerformance(stat: any, attendance: AttendanceStats | null, pen
   const reviews = ratio(stat?.targetReviews?.counted, stat?.targetReviews?.target);
   const due = valid(stat?.onTime) && valid(stat?.late) && valid(stat?.overdue) ? stat.onTime + stat.late + stat.overdue : null;
   const timing = stat?.timingUnavailable > 0 ? null : ratio(stat?.onTime, due);
-  const parts = { reviews, timing, attendance: ratio(attendance?.presentDays, attendance?.recordedDays) };
+  const parts = { reviews, timing, attendance: attendance && attendance.recordedDays > 0 ? ratio(attendance.presentDays, attendance.selectedDays) : null };
   let total = 0, weight = 0;
   for (const key of Object.keys(SI_WEIGHTS) as (keyof typeof SI_WEIGHTS)[]) {
     const score = parts[key];

@@ -2453,9 +2453,9 @@ test('target modal exposes load failures, mixed settings and partial or empty sa
   assert.match(text(tree),/No targets changed/);assert.doesNotMatch(text(tree),/target saved at/);
  }finally{harness.close();apiModule.api=original;}
 });
-test('zone and ward boundaries are always shown together without a visibility selector',async()=>{
+test('operational map temporarily hides boundaries while keeping location filters working',async()=>{
  const React=require('react'),savedMemo=React.useMemo,apiModule=require('../src/services/api.ts'),savedApi=apiModule.api;
- const {OperationalMap}=require('../src/components/map/OperationalMap.tsx'),{CityMap}=require('../src/components/map/CityMap.tsx'),{boundaryColor}=require('../src/services/operationsMap.ts');
+ const {OperationalMap}=require('../src/components/map/OperationalMap.tsx'),{CityMap}=require('../src/components/map/CityMap.tsx');
  const polygon={type:'Polygon',coordinates:[[[75,23],[76,23],[76,24],[75,24],[75,23]]]};
  const wards=[{id:'w1',zoneId:'z1',name:'Ward 1',geometry:polygon},{id:'w2',zoneId:'z1',name:'Ward 2',geometry:polygon},{id:'w3',zoneId:'z2',name:'Ward 3',geometry:polygon}];
  const zones=[{id:'z1',name:'Zone 1',geometry:polygon,derived:true,uploadedWardCount:2,totalWardCount:3},{id:'z2',name:'Zone 2',geometry:polygon}];
@@ -2463,9 +2463,9 @@ test('zone and ward boundaries are always shown together without a visibility se
  React.useMemo=read=>read();const harness=reviewHookHarness(),read=()=>OperationalMap({reports:[],currentUser:profile,onSelectReport:()=>{}}),flush=()=>new Promise(setImmediate);
  const find=(tree,match)=>boundaryTreeNodes(tree).find(match),select=(tree,label,value)=>find(tree,n=>n.props?.['aria-label']===label).props.onChange({target:{value}}),map=tree=>find(tree,n=>n.type===CityMap).props;
  try{
-  let tree=harness.render(read);await flush();tree=harness.render(read);assert.match(calls[0],/includeBoundaries=true/);assert.equal(map(tree).boundaries.length,5);assert.equal(find(tree,n=>n.props?.['aria-label']==='Boundary layer'),undefined);assert.equal(map(tree).assets.length,1);const color=boundaryColor(map(tree).boundaries.find(w=>w.id==='w2').id);
-  select(tree,'Map zone','z1');tree=harness.render(read);assert.deepEqual(map(tree).boundaries.map(w=>w.id),['z1','w1','w2']);select(tree,'Map ward','w2');tree=harness.render(read);assert.deepEqual(map(tree).boundaries.map(w=>w.id),['z1','w2']);assert.equal(boundaryColor(map(tree).boundaries[1].id),color);assert.equal(map(tree).assets.length,1);
-  find(tree,n=>n.props?.['aria-label']==='Reset map filters').props.onClick();tree=harness.render(read);assert.equal(map(tree).boundaries.length,5);assert.ok(boundaryTreeNodes(tree).some(n=>String(n.props?.children).includes('partial zone boundary')));
+  let tree=harness.render(read);await flush();tree=harness.render(read);assert.match(calls[0],/includeBoundaries=false/);assert.equal(map(tree).boundaries.length,0);assert.equal(find(tree,n=>n.props?.['aria-label']==='Boundary layer'),undefined);assert.equal(map(tree).assets.length,1);
+  select(tree,'Map zone','z1');tree=harness.render(read);assert.deepEqual(map(tree).boundaries,[]);assert.equal(map(tree).assets.length,1);select(tree,'Map ward','w2');tree=harness.render(read);assert.deepEqual(map(tree).boundaries,[]);assert.equal(map(tree).assets.length,1);
+  find(tree,n=>n.props?.['aria-label']==='Reset map filters').props.onClick();tree=harness.render(read);assert.equal(map(tree).boundaries.length,0);assert.equal(map(tree).assets.length,1);assert.ok(!boundaryTreeNodes(tree).some(n=>String(n.props?.children).includes('boundaries are always shown')));
  }finally{harness.close();React.useMemo=savedMemo;apiModule.api=savedApi;}
 });
 

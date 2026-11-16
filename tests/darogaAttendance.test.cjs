@@ -19,5 +19,33 @@ test('overall table shows no attendance data and excludes yesterday scores immed
  matrixStore.getDateRange=()=>({from,to});coverage.useInspectionCoverage=()=>({data:emptyCoverage(),loading:false});
  const props={city:{id:'city',enabledModules:[]},module:'ALL',rows:[{user:{id:'d',name:'Daroga',role:'SUPERVISOR',assignedWardIds:[]},stat:{performance:0}}],tab:'overall',onTab:()=>{},wards:[],zones:[]};
  function render(read){let index=0;React.useState=initial=>{index++;return[index===1?'':index===2?read:typeof initial==='function'?initial():initial,()=>{}];};React.useEffect=()=>{};React.useMemo=fn=>fn();try{return DarogaPerformanceTabs(props);}finally{React.useState=saved.useState;React.useEffect=saved.useEffect;React.useMemo=saved.useMemo;}}
- try{let html=renderToStaticMarkup(render({key:JSON.stringify(['city',from,to,matrixStore.loadRevision]),rows:[],status:'no_data',period:from}));assert.match(html,/No attendance data/);assert.match(html,/0.0%/);assert.doesNotMatch(html,/100.0%|33.3%/);html=renderToStaticMarkup(render({key:'yesterday',rows:[{matrixTrackUserId:'d',totalDays:1,presentDays:1}],status:'ready',period:'2026-11-15'}));assert.match(html,/Loading/);assert.doesNotMatch(html,/100.0%/);}finally{coverage.useInspectionCoverage=saved.coverage;matrixStore.getDateRange=saved.range;}
+ try{let html=renderToStaticMarkup(render({key:JSON.stringify(['city',from,to,matrixStore.loadRevision]),rows:[],status:'no_data',period:from}));assert.match(html,/No attendance data/);assert.match(html,/0.0%/);assert.doesNotMatch(html,/100.0%|33.3%/);html=renderToStaticMarkup(render({key:'yesterday',rows:[{matrixTrackUserId:'d',totalDays:1,presentDays:1}],status:'ready',period:'2026-11-15'}));assert.match(html,/Loading/);assert.doesNotMatch(html,/100.0%/);
+ const start='2026-10-22',end='2026-11-16';matrixStore.getDateRange=()=>({from:start,to:end});
+ const partial={key:JSON.stringify(['city',start,end,matrixStore.loadRevision]),rows:[{matrixTrackUserId:'d',totalDays:5,presentDays:5,absentDays:0}],status:'ready',period:`${start} to ${end}`};
+ html=renderToStaticMarkup(render(partial));assert.match(html,/19.2%/);assert.match(html,/5 \/ 26 days; 21 missing/);assert.doesNotMatch(html,/100.0%/);
+ props.tab='attendance';html=renderToStaticMarkup(render(partial));assert.match(html,/Selected days/);assert.match(html,/Missing days/);assert.match(html,/<td>26<\/td>/);assert.match(html,/<td>21<\/td>/);
+ }finally{coverage.useInspectionCoverage=saved.coverage;matrixStore.getDateRange=saved.range;}
+});
+
+
+test('partial attendance uploads cannot earn full-period Daroga attendance marks',()=>{
+ const {darogaAttendance}=require('../src/services/darogaBreakdown.ts');
+ const user={id:'d',name:'Daroga'},rows=[{matrixTrackUserId:'d',totalDays:5,presentDays:5,absentDays:0}];
+ const result=darogaAttendance(user,[],rows,{from:'2026-10-22',to:'2026-11-16'});
+ assert.equal(result.selectedDays,26);assert.equal(result.recordedDays,5);
+ assert.equal(result.presentDays,5);assert.equal(result.absentDays,0);assert.equal(result.missingDays,21);
+ assert.equal(result.score,5/26*100);
+ assert.ok(Math.abs(darogaOverall({inspection:80,cleaned:80,attendance:result.score}).score-(64+result.score*0.2))<1e-10);
+});
+
+test('full-period, single-day, absent, unmatched and invalid attendance remain distinct',()=>{
+ const {darogaAttendance}=require('../src/services/darogaBreakdown.ts');
+ const user={name:'Daroga'},period={from:'2026-10-31',to:'2026-11-01'};
+ const read=(totalDays,presentDays,absentDays,range=period)=>darogaAttendance(user,[],[{employeeName:'Daroga',totalDays,presentDays,absentDays}],range);
+ assert.equal(read(2,2,0).score,100);assert.equal(read(2,1,1).score,50);
+ assert.equal(read(1,1,0,{from,to}).score,100);assert.equal(read(1,0,1,{from,to}).score,0);
+ assert.equal(read(1,0,1).missingDays,1);assert.equal(read(0,0,0).score,null);
+ assert.equal(darogaAttendance(user,[],[],period),null);
+ assert.equal(read(3,3,0),null);assert.equal(read(2,3,0),null);
+ assert.equal(read(1,1,0,{from:to,to:'2026-11-15'}),null);
 });
