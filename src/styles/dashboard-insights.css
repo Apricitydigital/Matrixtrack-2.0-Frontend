@@ -380,3 +380,54 @@
 
 .zp-band{display:inline-flex;align-items:center;gap:6px;font-weight:600}.zp-band::before{content:"";width:9px;height:9px;border-radius:50%;background:#a9b6c0}
 .zp-band[data-band=GREEN]::before{background:#0ca30c}.zp-band[data-band=AMBER]::before{background:#eda100}.zp-band[data-band=RED]::before{background:#d03b3b}
+
+/* Plant & Processing is the only card left in the insights row */
+@media(min-width:701px){.commissioner-home .home-insights-grid{grid-template-columns:minmax(0,1fr)}.commissioner-home .home-insights-grid>.plant-overview{grid-column:auto}}
+
+/* Plant & Processing (pl-) */
+.pl{display:grid;gap:14px}
+.pl .home-section-heading{align-items:flex-start}
+.pl-link{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--di-blue);white-space:nowrap}
+.pl-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:14px;padding:0 24px}
+@media(max-width:900px){.pl-top{grid-template-columns:1fr;padding:0 16px}}
+.pl-hero{display:grid;gap:8px;align-content:center;padding:20px 22px;border-radius:14px;border:1px solid var(--line);border-left:5px solid #0ca30c;background:linear-gradient(120deg,var(--di-good-bg),var(--surface) 70%);text-align:left}
+.pl-hero[data-click=true]{cursor:pointer;transition:box-shadow .15s}.pl-hero[data-click=true]:hover{box-shadow:0 6px 18px #0b24351a}
+.pl-eyebrow{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.pl-pct{font-size:44px;font-weight:800;line-height:1.05;color:var(--ink);font-variant-numeric:tabular-nums}
+.pl-track{height:12px;border-radius:999px;background:#0ca30c26;overflow:hidden}.pl-track i{display:block;height:100%;border-radius:999px;background:#0ca30c;transition:width .4s}
+.pl-hero>p{margin:0;font-size:13px;color:var(--muted)}
+.pl-hero small{font-size:11.5px;color:var(--muted)}
+.pl-reporting{display:flex;align-items:center;gap:8px;margin-top:4px;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.pl-reporting b{color:var(--ink)}.pl-reporting i{flex:1;min-width:60px;height:6px;border-radius:999px;background:var(--viz-track);overflow:hidden}.pl-reporting i u{display:block;height:100%;background:#2a78d6;text-decoration:none}
+.pl-flow{display:grid;gap:8px;align-content:start;padding:16px 18px;border-radius:14px;border:1px solid var(--line);background:var(--surface-soft)}
+.pl-flow h3{margin:0;font-size:14px;font-weight:700;color:var(--ink)}.pl-flow h3 small{margin-left:8px;font-weight:400;font-size:12px;color:var(--muted)}
+.pl-lines{margin-top:0!important;grid-template-columns:1fr!important;gap:6px!important}
+.pl-lines>button{position:relative;padding-bottom:14px!important}
+.pl-plants{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 24px 20px}
+@media(max-width:700px){.pl-plants{grid-template-columns:1fr;padding:0 16px 16px}}
+.pl-list{display:grid;gap:8px;align-content:start;padding:14px 16px;border-radius:14px;border:1px solid var(--line);border-top:4px solid var(--line)}
+.pl-list[data-tone=good]{border-top-color:#0ca30c}.pl-list[data-tone=low]{border-top-color:#eda100}
+.pl-list h4{margin:0;font-size:13px;font-weight:700;color:var(--ink)}
+.pl-list ol{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.pl-list li{display:grid;grid-template-columns:minmax(90px,1.2fr) 1.4fr 56px;align-items:center;gap:10px;font-size:13px;color:var(--ink)}
+.pl-list li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-list li i{height:8px;border-radius:999px;background:var(--viz-track);overflow:hidden}.pl-list li u{display:block;height:100%;border-radius:999px;background:#0ca30c;text-decoration:none}
+.pl-list[data-tone=low] li u{background:#eda100}
+.pl-list li b{justify-self:end;font-variant-numeric:tabular-nums}
+.pl-list p{margin:0;font-size:12.5px;color:var(--muted)}
+
+/* Plant & Processing: more compact */
+.pl{gap:10px}
+.pl-top{gap:10px;padding:0 20px}
+.pl-hero{gap:6px;padding:14px 18px}
+.pl-pct{font-size:34px}
+.pl-track{height:9px}
+.pl-reporting{margin-top:2px;padding-top:8px}
+.pl-flow{gap:6px;padding:12px 14px}
+.pl-lines{grid-template-columns:1fr 1fr!important;gap:2px 18px!important}
+@media(max-width:700px){.pl-lines{grid-template-columns:1fr!important}}
+.pl-lines>button{padding-top:6px!important;padding-bottom:12px!important}
+.pl-plants{gap:10px;padding:0 20px 14px}
+.pl-list{gap:6px;padding:10px 14px}
+.pl-list ol{gap:6px}
+.pl-lines>button:first-child{grid-column:1/-1}
