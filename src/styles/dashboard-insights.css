@@ -300,3 +300,11 @@
 .ir-dot{display:inline-flex;align-items:center;gap:8px}.ir-dot i{width:10px;height:10px;border-radius:3px}
 .ir-card{grid-template-rows:auto auto auto auto 1fr}.ir-card>.ir-note{align-self:end}
 .ir-figs button:disabled{cursor:default}
+
+/* Module cards: equal height, same structure, AI and pending rows pinned to the bottom */
+.inspection-module-cards.inspection-module-cards{align-items:stretch}
+.inspection-module-cards .inspection-module-card{display:flex;flex-direction:column}
+.inspection-module-cards .inspection-card-primary strong{min-height:42px;display:flex;align-items:center}
+.inspection-module-cards .inspection-card-status{align-content:start;min-height:96px}
+.inspection-module-cards .module-ai-strip{margin-top:auto;min-height:78px;align-content:center}
+.inspection-module-cards .module-ai-strip+.module-pending{margin-top:10px}
