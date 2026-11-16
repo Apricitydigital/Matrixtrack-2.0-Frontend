@@ -1,0 +1,63 @@
+.user-performance-page{--up-ink:#173e50;--up-muted:#627e8e;--up-line:#dce7ed;--up-surface:#fff;--up-soft:#f4f8fa}
+.user-performance-page>.commissioner-heading{align-items:center;padding-bottom:5px}
+.user-performance-page .commissioner-heading h1{font-size:30px;letter-spacing:-1px}
+.user-performance-page .commissioner-heading p{max-width:620px;color:var(--up-muted);font-size:14px;line-height:1.7;margin-top:8px}
+.user-performance-page .performance-role-tabs{display:inline-flex;gap:5px;background:var(--up-surface);border:1px solid var(--up-line);padding:5px;border-radius:13px}
+.user-performance-page .performance-role-tabs>button{border:0!important;border-radius:9px;padding:10px 18px;display:flex;gap:12px;align-items:center;font-size:14px;font-weight:600;background:transparent;color:var(--up-muted)}
+.user-performance-page .performance-role-tabs>button[aria-pressed=true]{background:#173e50;color:#fff;box-shadow:0 3px 7px #163b501a}
+.performance-role-tabs button>span{font-size:11px;border-radius:5px;padding:2px 6px;background:#78919f18;font-variant-numeric:tabular-nums}
+.performance-role-tabs button[aria-pressed=true]>span{background:#ffffff20;color:#d5f3ed}
+.user-performance-page .ops-filter-panel{display:grid;grid-template-columns:minmax(180px,1.2fr) repeat(3,minmax(140px,1fr)) auto;align-items:end;padding:18px 20px;border-radius:14px;background:var(--up-surface);border:1px solid var(--up-line);gap:14px}
+.user-performance-page .ops-filter{min-width:0}.user-performance-page .ops-filter>span{color:var(--up-muted);font-size:12px;font-weight:600;margin-bottom:7px;display:block}
+.user-performance-page .ops-filter :is(input,select){height:42px;width:100%;border-radius:8px;background:var(--up-soft);font-size:13px;color:var(--up-ink);border-color:var(--up-line)}
+.user-performance-page .ops-reset{height:42px;white-space:nowrap;font-size:12px;color:var(--up-muted)}
+.daroga-performance-view{display:grid;gap:20px;min-width:0}
+.officer-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.officer-overview article{padding:21px 22px;border:1px solid var(--up-line);background:var(--up-surface);border-radius:14px;min-width:0}
+.officer-overview article>span{font-size:12px;color:var(--up-muted);font-weight:600;display:block}
+.officer-overview article>strong{display:block;font-size:29px;letter-spacing:-.8px;color:var(--up-ink);margin:14px 0 8px;line-height:1.2;font-variant-numeric:tabular-nums}
+.officer-overview strong>small{font-size:13px;font-weight:400;letter-spacing:0}
+.officer-overview article>p{font-size:11px;line-height:1.7;color:var(--up-muted)}
+.officer-overview .officer-overview-primary{background:linear-gradient(125deg,#183f50,#176264);border-color:transparent}
+.officer-overview-primary>strong{color:#fff!important}.officer-overview-primary>span,.officer-overview-primary>p{color:#cae4e3!important}
+.user-performance-page .daroga-performance-tabs{border-radius:16px;border:1px solid var(--up-line);background:var(--up-surface);overflow:hidden;box-shadow:0 5px 22px #163c5004}
+.daroga-performance-tabs>.workspace-panel-heading{padding:23px 24px;gap:18px;flex-wrap:wrap}
+.daroga-performance-tabs .workspace-eyebrow{font-size:10px;letter-spacing:1.6px;color:#16857e;font-weight:700}
+.daroga-performance-tabs .workspace-panel-heading h2{font-size:20px;color:var(--up-ink);margin-top:5px;letter-spacing:-.5px}
+.officer-table-hint{font-size:12px;color:var(--up-muted);margin-top:6px}
+.user-performance-page .daroga-performance-tabs .view-switch{background:var(--up-soft);border:1px solid var(--up-line);padding:4px;border-radius:10px;display:flex;flex-wrap:wrap;gap:3px}
+.user-performance-page .daroga-performance-tabs .view-switch button{font-size:12px;border-radius:7px;padding:9px 12px;color:var(--up-muted)}
+.user-performance-page .daroga-performance-tabs .view-switch button.active{background:var(--up-surface);color:var(--up-ink);box-shadow:0 2px 5px #163b5010;font-weight:600}
+.officer-score-guide{border-top:1px solid var(--up-line);background:var(--up-soft)}
+.officer-score-guide>summary{padding:12px 24px;color:var(--up-muted);font-size:12px;cursor:pointer}
+.officer-score-guide .score-context-note{padding:0 24px 16px;margin:0;background:transparent;font-size:12px;line-height:1.8}
+.officer-attendance-notice{padding:11px 24px;border-top:1px solid #e9dcbc;background:#fcf8ed;color:#89632c;font-size:12px;display:flex;align-items:center;gap:8px}
+.officer-attendance-notice i{height:6px;width:6px;border-radius:100%;background:#bd9448;flex-shrink:0}
+.user-performance-page .daroga-performance-tabs table{min-width:850px;border-collapse:collapse}
+.user-performance-page .daroga-performance-tabs table th{background:var(--up-soft);font-size:11px;font-weight:600;color:var(--up-muted);padding:14px 20px;white-space:nowrap;border-bottom:1px solid var(--up-line)}
+.user-performance-page .daroga-performance-tabs table td{padding:17px 20px;color:var(--up-ink);font-size:12px;border-bottom:1px solid var(--up-line);vertical-align:middle;line-height:1.6}
+.user-performance-page .daroga-performance-tabs tbody tr{background:var(--up-surface)}
+.user-performance-page .daroga-performance-tabs tbody tr:hover{background:var(--up-soft)}
+.user-performance-page .daroga-performance-tabs tbody tr:focus-visible{outline:2px solid #16857e;outline-offset:-2px}
+.officer-identity{display:flex;align-items:center;gap:11px;min-width:160px}.officer-identity strong{font-size:13px;font-weight:600;display:block}.officer-identity small{display:block;font-size:10px;color:var(--up-muted);margin-top:3px}
+.officer-avatar{height:34px;width:34px;flex-shrink:0;display:grid;place-items:center;background:#e7f1f1;color:#237574;font-size:11px;font-weight:700;border-radius:10px}
+.officer-score{display:block;min-width:85px;max-width:115px;font-variant-numeric:tabular-nums}.officer-score strong{font-size:13px;font-weight:600}.officer-score-track{display:block;height:4px;background:#e9eff2;border-radius:4px;margin-top:7px;overflow:hidden}.officer-score-track i{display:block;height:100%;background:#a87557;border-radius:4px}.officer-score[data-tone=good] i{background:#238b7f}.officer-score[data-tone=fair] i{background:#be9a51}.officer-score[data-tone=muted] strong,.officer-data-label{font-size:11px;font-weight:400;color:var(--up-muted)}
+.user-performance-page>.analytics-register{background:var(--up-surface);border-radius:13px;border:1px solid var(--up-line)}
+.user-performance-page :is(button,input,select,summary):focus-visible{outline:2px solid #16857e;outline-offset:3px}
+.si-score-banner{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:24px 26px;background:var(--up-surface);border:1px solid var(--up-line);border-left:4px solid #208c81;border-radius:14px}
+.si-score-banner .workspace-eyebrow{font-size:10px;letter-spacing:1.5px;color:#208c81;font-weight:700}.si-score-banner h2{font-size:21px;letter-spacing:-.5px;font-weight:650;color:var(--up-ink);margin:8px 0}.si-score-banner p{font-size:12px;color:var(--up-muted);line-height:1.7}
+.si-weight-pills{display:flex;gap:8px;flex-wrap:wrap}.si-weight-pills>span{display:flex;align-items:center;gap:7px;padding:10px 12px;border-radius:8px;background:var(--up-soft);border:1px solid var(--up-line);color:var(--up-ink);font-size:11px;font-weight:600;white-space:nowrap}
+.si-officer-open{text-align:left;width:100%;border-radius:7px}.si-assigned-ward{display:block;color:var(--up-muted);font-size:11px;margin-top:4px;max-width:240px}.si-detail-arrow{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--up-soft);color:#208c81;border:1px solid var(--up-line)}
+.si-formula-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:0 24px 18px}.si-formula-grid article{padding:16px;background:var(--up-surface,#fff);border:1px solid var(--up-line,#dce7ed);border-radius:10px;color:var(--up-ink,#173e50);min-width:0}.si-formula-grid b,.si-formula-grid article>span{font-size:12px;display:block;margin-bottom:12px}.si-formula-grid p{font-size:12px;color:var(--up-muted,#627e8e);line-height:1.8;margin-top:10px}
+.si-detail{--up-ink:#173e50;--up-muted:#627e8e;--up-line:#dce7ed;--up-surface:#fff;--up-soft:#f4f8fa}.si-detail .si-formula-grid{padding:0}.si-detail-heading{background:linear-gradient(125deg,#183f50,#176264);padding:24px;border-radius:13px;color:#fff}.si-detail-heading>span{font-size:10px;letter-spacing:1.4px;color:#cae4e3}.si-detail-heading>strong{display:block;font-size:36px;margin:10px 0;font-weight:650;letter-spacing:-1px}.si-detail-heading>p{color:#cae4e3;font-size:12px;line-height:1.8}
+.si-detail .view-switch{display:flex;flex-wrap:wrap;gap:6px;padding:5px;border:1px solid var(--up-line);background:var(--up-soft);border-radius:10px}.si-detail .view-switch button{padding:9px 13px;border-radius:7px;font-size:12px;color:var(--up-muted)}.si-detail .view-switch button.active{background:var(--up-surface);color:var(--up-ink);font-weight:600;box-shadow:0 2px 6px #163b5012}
+[data-theme=dark] .si-detail,.dark .si-detail{--up-ink:#dfedf1;--up-muted:#a2b8c4;--up-line:#304954;--up-surface:#152c38;--up-soft:#1c3542}
+@media(max-width:1100px){.si-score-banner{align-items:start;flex-direction:column;gap:15px}}
+@media(max-width:600px){.si-score-banner{padding:20px 16px}.si-score-banner h2{font-size:18px}.si-weight-pills{gap:5px}.si-weight-pills>span{padding:8px;font-size:10px}.si-formula-grid{grid-template-columns:1fr;padding:0 16px 16px}.si-detail .si-formula-grid{padding:0}}
+@media(max-width:1100px){.officer-overview{grid-template-columns:repeat(2,minmax(0,1fr))}.user-performance-page .ops-filter-panel{grid-template-columns:repeat(2,minmax(0,1fr))}.user-performance-page .ops-reset{justify-self:start}.daroga-performance-tabs .view-switch{width:100%}}
+@media(max-width:600px){.user-performance-page .commissioner-heading h1{font-size:25px}.user-performance-page .performance-role-tabs{display:flex}.user-performance-page .performance-role-tabs>button{flex:1;justify-content:center;padding:10px 12px}.user-performance-page .ops-filter-panel{padding:15px;gap:12px}.user-performance-page .ops-filter:first-child{grid-column:1/-1}.officer-overview{gap:10px}.officer-overview article{padding:16px 14px}.officer-overview article>strong{font-size:24px}.officer-overview article>span{font-size:11px}.daroga-performance-tabs>.workspace-panel-heading{padding:20px 16px}.user-performance-page .daroga-performance-tabs .view-switch button{flex:1 1 40%;padding:9px 7px}.officer-score-guide>summary,.officer-attendance-notice{padding:12px 16px}}
+@media print{.officer-overview{grid-template-columns:repeat(4,1fr)}.officer-overview-primary{print-color-adjust:exact}.officer-identity small{display:none}.officer-score-guide>p{display:block!important}.user-performance-page .daroga-performance-tabs table{min-width:0}}
+
+.dark .user-performance-page,[data-theme=dark] .user-performance-page{--up-ink:#dfedf1;--up-muted:#a2b8c4;--up-line:#304954;--up-surface:#152c38;--up-soft:#1c3542}
+[data-theme=dark] .officer-avatar,.dark .officer-avatar{background:#244b50;color:#a5e3d9}
+[data-theme=dark] .officer-attendance-notice,.dark .officer-attendance-notice{background:#342e21;border-color:#625438;color:#e1c894}
