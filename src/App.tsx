@@ -11,7 +11,7 @@ import { inspectionDrillFilters } from './services/inspectionPeriod';
  * - 100-point Ward Ranking engine
  */
 
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   RoleType,
   User,
@@ -318,6 +318,32 @@ export function Dashboard({ initialPage }: { initialPage?: string } = {}) {
     }
     if (canAccessPage(currentUser.role as RoleType, pageId, effectiveCity)) setActivePageId(pageId);
   };
+
+  // Browser Back / Forward move between dashboard pages instead of leaving the site. The page id lives in the URL hash,
+  // so it also survives a refresh. Only the hash is touched: the path and query string stay as they are.
+  const activeRef = useRef(activePageId);
+  activeRef.current = activePageId;
+  const accessRef = useRef<(id: string) => boolean>(() => false);
+  accessRef.current = (id: string) => /^[a-z]+_[a-z0-9_]+$/.test(id) && canAccessPage(currentUser.role as RoleType, id, effectiveCity);
+  useEffect(() => {
+    const fromHash = window.location.hash.replace(/^#\/?/, '');
+    if (fromHash && fromHash !== activeRef.current && accessRef.current(fromHash)) setActivePageId(fromHash);
+    else window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}#${activeRef.current}`);
+    const onHashChange = () => {
+      const id = window.location.hash.replace(/^#\/?/, '');
+      if (!id || id === activeRef.current) return;
+      if (accessRef.current(id)) setActivePageId(id);
+      else window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}#${activeRef.current}`);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+  const hashReady = useRef(false);
+  useEffect(() => {
+    // The first run belongs to the mount effect above, which may restore the page from the URL.
+    if (!hashReady.current) { hashReady.current = true; return; }
+    if (window.location.hash.replace(/^#\/?/, '') !== activePageId) window.location.hash = activePageId;
+  }, [activePageId]);
 
   // Determine if current user has attendance upload capability
 
