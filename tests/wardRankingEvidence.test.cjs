@@ -52,3 +52,14 @@ test('compact selected evidence renders the score equation and keeps extra count
  assert.match(html,/15.89 \/ 24/);assert.match(html,/= 19.86/);assert.match(html,/Matched with attendance sheet/);
  assert.match(html,/<details[^>]*><summary>More details<\/summary>/);assert.doesNotMatch(html,/Unique Employee ID|weighted achievement|insight-bar-chart/);
 });
+
+
+test('workforce breakdown adds the three supported factors directly without a 24-to-30 conversion',()=>{
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+ require.extensions['.tsx']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.React,esModuleInterop:true}}).outputText,f);
+ const {WardScoreBreakdown}=require('../src/components/analytics/WardScoreBreakdown.tsx');
+ const part=(score,maxScore,applicable=true)=>({score,maxScore,applicable,percentage:score/maxScore*100});
+ const factor={key:'workforce',label:'Workforce attendance',score:11.34,maxScore:30,metrics:{present:108,manpowerScheduled:276},components:{deployment:part(8.8,22.5),supervisorAvailability:part(1.56,3.75),unmannedBeatControl:part(.98,3.75),shiftCompliance:part(0,0,false)}};
+ const html=renderToStaticMarkup(React.createElement(WardScoreBreakdown,{factor}));
+ assert.match(html,/8.8 \+ 1.56 \+ 0.98/);assert.doesNotMatch(html,/\/ 24/);assert.match(html,/22.5/);assert.match(html,/3.75/);
+});
