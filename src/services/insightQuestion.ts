@@ -25,7 +25,7 @@ export function resolveInsightScope(question:string,zones:NamedScope[],wards:Nam
   const numbers=[...q.matchAll(new RegExp(`\\b${kind}\\s+(\\d+)\\b`,'g'))].map(match=>Number(match[1]));
   const selected=new Map<string,NamedScope>();let issue='';
   for(const number of numbers){const matches=items.filter(item=>{const match=normalizeInsightQuestion(item.name).match(new RegExp(`\\b${kind}\\s+(\\d+)\\b`));return match&&Number(match[1])===number;});
-   if(matches.length===1)selected.set(matches[0].id,matches[0]);else issue=matches.length>1?`Please choose the full ${kind} name; more than one ${kind} uses number ${number}.`:`I could not find ${kind} ${number} in your city. Please choose a ${kind} listed in Zone Details.`;
+   if(matches.length===1)selected.set(matches[0].id,matches[0]);else issue=matches.length>1?`Please choose the full ${kind} name; more than one ${kind} uses number ${number}.`:`I could not find ${kind} ${number} in your city. Please choose a ${kind} listed in Zone Ranking.`;
   }
   if(!numbers.length)for(const item of items)if(new RegExp(`(?:^|\\W)${escape(normalizeInsightQuestion(item.name))}(?=$|\\W)`,'i').test(q))selected.set(item.id,item);
   return {items:[...selected.values()],issue};

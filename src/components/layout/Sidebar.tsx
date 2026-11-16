@@ -180,7 +180,8 @@ export function getNavGroups(currentRole: RoleType, pendingRequestCount = 0, ope
             groupTitle: 'OPERATIONS COMMAND',
             items: [
               { id: 'ulb_dashboard', label: 'Operations Dashboard', icon: LayoutDashboard },
-              { id: 'ulb_map', label: 'City Operations Map', icon: Map }
+              { id: 'ulb_map', label: 'City Operations Map', icon: Map },
+              { id: 'ulb_zone_ranking', label: 'Zone Ranking', icon: Building2 }
             ]
           },
           {
@@ -208,7 +209,7 @@ export function getNavGroups(currentRole: RoleType, pendingRequestCount = 0, ope
             items: [
               { id: 'comm_dashboard', label: 'City Overview', icon: LayoutDashboard },
               { id: 'comm_map', label: 'City Operations Map', icon: Map },
-              { id: 'comm_zone_ward', label: 'Zone Details', icon: Building2 }
+              { id: 'comm_zone_ward', label: 'Zone Ranking', icon: Building2 }
             ]
           },
           {

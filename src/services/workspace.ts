@@ -30,7 +30,7 @@ export function pageDatasets(pageId: string, role?: string): Dataset[] {
   if (['comm_dashboard','comm_map'].includes(pageId)) return ['geography'];
   if (['comm_plant','comm_iec_oversight'].includes(pageId)) return ['geography'];
   if (pageId === 'comm_attendance') return ['geography'];
-  if (pageId === 'comm_zone_ward') return ['geography'];
+  if (['comm_zone_ward','ulb_zone_ranking'].includes(pageId)) return ['geography'];
   if (pageId === 'comm_user_perf') return ['geography','users'];
   if (pageId === 'comm_inspection_perf') return ['geography','users'];
   if (pageId === 'sa_dashboard') return ['users', 'registration'];

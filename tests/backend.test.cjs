@@ -777,7 +777,7 @@ test('missing attendance shift and ward quality stay unassessed', () => {
   const { mapAttendance } = require('../src/services/adapters.ts');
   assert.equal(mapAttendance({ id: 'attendance-a' }, 'city-a').shift, 'not_recorded');
   const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
-  const { ZoneWardDetails } = require('../src/pages/commissioner/ZoneWardDetails.tsx');
+  const { WardOperationalDetails: ZoneWardDetails } = require('../src/pages/commissioner/WardOperationalDetails.tsx');
   const html = renderToStaticMarkup(React.createElement(ZoneWardDetails, { city: { id: 'city-a', name: 'Test City' }, zones: [], wards: [{ id: 'ward-a', cityId: 'city-a', name: 'Ward A', population: 0, areaSqKm: 0 }], beats: [], reports: [], iecIssues: [], attendance: [], users: [], onSelectReport: () => { } }));
   assert.doesNotMatch(html, /94%|100% Active|Biometric muster/);
   assert.match(html, /Not supplied/);
@@ -1937,7 +1937,7 @@ test('ward history uses all 29 source reports and readable names independently o
   const rows = wardInspectionRows(data, 'city-a', 'w10', [{ id: 'z', name: 'Zone 1' }], wards); assert.equal(rows.length, 29); assert.ok(rows.every(r => r.assetName.startsWith('Beat '))); assert.ok(rows.every(r => r.reportNumber === r.assetName)); assert.equal(rows[0].assetName, 'Beat 1'); assert.equal(rows[1].assetName, 'Beat 2'); assert.equal(rows[9].assetName, 'Beat 10'); assert.ok(rows.every(r => r.status === 'pending_review'));
   const counts = coverageCounts(data, { ward: 'w10' }), target = targetDelivery(null, counts); assert.equal(counts.inspections, 29); assert.equal(target.target, 31); assert.equal(target.completed, 29); assert.equal(target.remaining, 2); assert.equal(inspectionOutcomes(data, { ward: 'w10' }).rows.find(r => r.id === 'pending_review').value, 29);
   const React = require('react'), { renderToStaticMarkup } = require('react-dom/server'); const hook = require('../src/services/useInspectionCoverage.ts'), original = hook.useInspectionCoverage; hook.useInspectionCoverage = () => ({ data, loading: false });
-  try { const { ZoneWardDetails } = require('../src/pages/commissioner/ZoneWardDetails.tsx'); const html = renderToStaticMarkup(React.createElement(ZoneWardDetails, { city: { id: 'city-a', name: 'City', enabledModules: ['sweeping'] }, zones: [{ id: 'z', cityId: 'city-a', name: 'Zone 1' }], wards: [wards[0]], beats: [], users: [], reports: rows.slice(0, 4), iecIssues: [], attendance: [], onSelectReport: () => { } })); assert.match(html, /29 submitted reports awaiting review/); assert.match(html, /2 more inspections needed/); assert.match(html, /29 matching \/ 29 available/); assert.match(html, /of 29/); assert.match(html, /Zone 1.*Ward 10 - Tilkeshwar/); assert.doesNotMatch(html, /00000000-0000|Load more reports|Backend target reference/); assert.equal((html.match(/data-ward-report/g) || []).length, 10); } finally { hook.useInspectionCoverage = original; }
+  try { const { WardOperationalDetails: ZoneWardDetails } = require('../src/pages/commissioner/WardOperationalDetails.tsx'); const html = renderToStaticMarkup(React.createElement(ZoneWardDetails, { city: { id: 'city-a', name: 'City', enabledModules: ['sweeping'] }, zones: [{ id: 'z', cityId: 'city-a', name: 'Zone 1' }], wards: [wards[0]], beats: [], users: [], reports: rows.slice(0, 4), iecIssues: [], attendance: [], onSelectReport: () => { } })); assert.match(html, /29 submitted reports awaiting review/); assert.match(html, /2 more inspections needed/); assert.match(html, /29 matching \/ 29 available/); assert.match(html, /of 29/); assert.match(html, /Zone 1.*Ward 10 - Tilkeshwar/); assert.doesNotMatch(html, /00000000-0000|Load more reports|Backend target reference/); assert.equal((html.match(/data-ward-report/g) || []).length, 10); } finally { hook.useInspectionCoverage = original; }
 });
 
 
@@ -2418,6 +2418,41 @@ function boundaryTreeNodes(tree){
  if(!tree||typeof tree!=='object')return [];
  return [tree,...boundaryTreeNodes(tree.props?.children)];
 }
+test('target modal loads the automatic SI percent, saves the selected city and reads back the saved rule',async()=>{
+ const apiModule=require('../src/services/api.ts'),original=apiModule.api,{UpdateTargetModal}=require('../src/components/analytics/UpdateTargetModal.tsx');
+ const jobs=[];let saved=0;apiModule.api=(path,options)=>new Promise((resolve,reject)=>jobs.push({path,options,resolve,reject}));
+ const harness=reviewHookHarness(),props={isOpen:true,cityId:'city-a',zones:[],wards:[],onClose:()=>{},onSaved:()=>saved++},read=()=>UpdateTargetModal(props),flush=()=>new Promise(setImmediate);
+ const find=(tree,predicate)=>boundaryTreeNodes(tree).find(predicate),input=tree=>find(tree,n=>n.type==='input'),button=(tree,text)=>find(tree,n=>n.type==='button'&&n.props.children===text),text=tree=>boundaryTreeNodes(tree).flatMap(n=>n.props?.children??[]).filter(s=>typeof s==='string').join(' ');
+ try{
+  let tree=harness.render(read);button(tree,'SI').props.onClick();tree=harness.render(read);
+  assert.equal(jobs[0].options.signal.aborted,true);assert.equal(input(tree).props.disabled,true);
+  jobs[1].resolve({targets:0,percentTargets:0,percents:[],defaultPercent:10});await flush();tree=harness.render(read);
+  assert.equal(input(tree).props.value,'10');assert.match(text(tree),/10% automatic daily target/);assert.equal(jobs[1].options.cache,'no-store');assert.equal(jobs[1].options.headers['x-city-id'],'city-a');
+  input(tree).props.onChange({target:{value:'20'}});tree=harness.render(read);const saving=find(tree,n=>n.type==='form').props.onSubmit({preventDefault(){}});
+  assert.deepEqual(JSON.parse(jobs[2].options.body),{role:'QC',percent:20,zoneIds:[],wardIds:[]});assert.equal(jobs[2].options.method,'POST');assert.equal(jobs[2].options.headers['x-city-id'],'city-a');
+  jobs[2].resolve({updated:3,created:0,skipped:[]});await saving;tree=harness.render(read);assert.equal(saved,1);assert.match(text(tree),/saved at 20%/);
+  jobs[3].resolve({targets:3,percentTargets:3,percents:[20],defaultPercent:10});await flush();tree=harness.render(read);assert.equal(input(tree).props.value,'20');assert.match(text(tree),/Current saved: 20%/);
+  jobs[0].resolve({targets:1,percentTargets:1,percents:[80]});await flush();assert.equal(input(harness.render(read)).props.value,'20');
+  props.cityId='city-b';tree=harness.render(read);assert.equal(input(tree).props.value,'');assert.equal(jobs[4].options.headers['x-city-id'],'city-b');
+ }finally{harness.close();apiModule.api=original;}
+});
+
+test('target modal exposes load failures, mixed settings and partial or empty saves without claiming full success',async()=>{
+ const apiModule=require('../src/services/api.ts'),original=apiModule.api,{UpdateTargetModal}=require('../src/components/analytics/UpdateTargetModal.tsx');
+ const jobs=[];apiModule.api=(path,options)=>new Promise((resolve,reject)=>jobs.push({path,options,resolve,reject}));
+ const harness=reviewHookHarness(),read=()=>UpdateTargetModal({isOpen:true,cityId:'city',zones:[],wards:[],onClose:()=>{},onSaved:()=>{}}),flush=()=>new Promise(setImmediate);
+ const find=(tree,predicate)=>boundaryTreeNodes(tree).find(predicate),input=tree=>find(tree,n=>n.type==='input'),button=(tree,text)=>find(tree,n=>n.type==='button'&&n.props.children===text),text=tree=>boundaryTreeNodes(tree).flatMap(n=>n.props?.children??[]).filter(s=>typeof s==='string').join(' ');
+ try{
+  harness.render(read);jobs[0].reject(new Error('offline'));await flush();let tree=harness.render(read);assert.match(text(tree),/Unable to load the current target/);assert.equal(button(tree,'Save target').props.disabled,true);
+  button(tree,'Retry').props.onClick();harness.render(read);jobs[1].resolve({targets:3,percentTargets:2,percents:[10,30]});await flush();tree=harness.render(read);
+  assert.equal(input(tree).props.value,'');assert.match(text(tree),/10%, 30%/);assert.match(text(tree),/Other targets use fixed counts/);
+  input(tree).props.onChange({target:{value:'25'}});tree=harness.render(read);let saving=find(tree,n=>n.type==='form').props.onSubmit({preventDefault(){}});
+  jobs[2].resolve({updated:1,created:0,skipped:['Officer B: not saved']});await saving;tree=harness.render(read);assert.match(text(tree),/1 skipped/);assert.match(text(tree),/Officer B: not saved/);
+  jobs[3].resolve({targets:2,percentTargets:2,percents:[25]});await flush();tree=harness.render(read);
+  saving=find(tree,n=>n.type==='form').props.onSubmit({preventDefault(){}});jobs[4].resolve({updated:0,created:0,skipped:[]});await saving;tree=harness.render(read);
+  assert.match(text(tree),/No targets changed/);assert.doesNotMatch(text(tree),/target saved at/);
+ }finally{harness.close();apiModule.api=original;}
+});
 test('zone and ward boundaries are always shown together without a visibility selector',async()=>{
  const React=require('react'),savedMemo=React.useMemo,apiModule=require('../src/services/api.ts'),savedApi=apiModule.api;
  const {OperationalMap}=require('../src/components/map/OperationalMap.tsx'),{CityMap}=require('../src/components/map/CityMap.tsx'),{boundaryColor}=require('../src/services/operationsMap.ts');
