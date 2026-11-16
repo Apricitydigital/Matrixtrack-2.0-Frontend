@@ -1,0 +1,20 @@
+.register-status-chart{padding:12px 24px 22px;color:var(--viz-ink)}
+.register-status-summary{display:flex;gap:32px;padding-bottom:18px;margin-bottom:16px;border-bottom:1px solid var(--viz-grid)}
+.register-status-summary>div{display:grid;gap:4px}
+.register-status-summary strong{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.register-status-summary span,.register-status-note,.register-status-empty{font-size:12px;color:var(--viz-muted)}
+.register-status-bars{display:grid;gap:8px}
+.register-status-bars>button{display:grid;grid-template-columns:minmax(0,145px) minmax(35px,1fr) minmax(28px,auto) 44px 12px;gap:10px;align-items:center;width:100%;padding:8px 5px;border:0;border-radius:6px;background:transparent;color:inherit;text-align:left;font-size:13px}
+.register-status-bars>button:disabled{opacity:1;cursor:default}
+.register-status-bars>button:not(:disabled){cursor:pointer}
+.register-status-bars>button:not(:disabled):hover{background:var(--viz-track)}
+.register-status-bars>button:focus-visible{outline:2px solid var(--viz-axis);outline-offset:2px}
+.register-status-label{line-height:1.4}
+.register-status-track{display:block;height:12px;border-radius:4px;background:var(--viz-track);overflow:hidden}
+.register-status-track>i{display:block;height:100%;border-radius:4px}
+.register-status-bars strong,.register-status-bars small{text-align:right;font-variant-numeric:tabular-nums}
+.register-status-bars small,.register-status-bars svg{color:var(--viz-muted)}
+.register-status-bars>button:disabled svg{visibility:hidden}
+.register-status-note{line-height:1.6;margin:14px 0 0}
+.register-status-empty{padding:32px 0}
+@media(max-width:600px){.register-status-chart{padding:12px 18px 20px}.register-status-bars>button{grid-template-columns:minmax(0,115px) minmax(25px,1fr) minmax(22px,auto) 36px;gap:7px;font-size:12px}.register-status-bars svg{display:none}.register-status-summary{gap:24px}.register-status-bars small{font-size:11px}}
