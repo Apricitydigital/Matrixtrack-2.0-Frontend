@@ -65,7 +65,7 @@ export function ZoneOverviewCards({cards,loading,onSelect,detail}:{cards:ZoneOve
           <div><dt>Received</dt><dd>{loading?'…':fmt(c.completed)}</dd></div>
           <div data-met={!loading&&c.pending===0}><dt>Still needed</dt><dd>{loading?'…':fmt(c.pending)}</dd></div>
         </dl>
-        <div className="zc-foot"><span title="Registered assets multiplied by selected days; one report per asset per day.">Full target <b data-zone-full-target={c.id}>{loading?'…':fmt(c.fullTarget)}</b></span><span className="zc-details">Details<ChevronRight size={13}/></span></div>
+        <div className="zc-foot"><span title="Registered assets multiplied by selected days; one report per asset per day.">At 100%: <b data-zone-full-target={c.id}>{loading?'…':fmt(c.fullTarget)}</b></span><span className="zc-details">Details<ChevronRight size={13}/></span></div>
       </button>;})}</div>
     {!cards.length&&<div className="home-empty">No zones in the selected scope.</div>}
   </section>;
