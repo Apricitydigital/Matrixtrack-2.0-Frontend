@@ -10,6 +10,7 @@
 @import "./styles/attendance-reconciliation.css";
 @import "./styles/zone-ranking.css";
 @import "./styles/user-performance.css";
+@import "./styles/workforce-evidence.css";
 
 @theme {
   --text-xs: 0.75rem;

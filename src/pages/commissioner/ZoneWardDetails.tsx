@@ -125,7 +125,7 @@ export function ZoneWardDetails(props: ZoneWardDetailsProps) {
           {!assessedWard ? <div className="analytics-empty">This ward has not been assessed for the selected dates. Available inspections can still be viewed under Inspections & reports.</div> : <>
             <p className="zr-score-note">Select a component to see actuals, requirements and the score calculation.</p>
             <div className="score-component-grid">{explanation.components.map(item => <button key={item.key} className={factor?.key === item.key ? 'selected' : ''} aria-pressed={factor?.key === item.key} onClick={() => setComponent(item.key)}><span>{item.label}</span><strong>{item.applicable === false ? 'N/A' : amount(item.score, 2)}{item.applicable !== false && <small>/ {amount(item.maxScore, 2)}</small>}</strong><span className="zr-track"><i style={{ width: `${item.applicable !== false && item.maxScore > 0 ? Math.min(100, item.score / item.maxScore * 100) : 0}%` }}/></span><small>{item.applicable === false ? 'Not applicable' : `${amount(Math.max(0, item.maxScore - item.score), 2)} points to improve`}</small></button>)}</div>
-            {factor && <WardScoreBreakdown key={`${ward.wardId}:${factor.key}`} factor={factor}/>}
+            {factor && <WardScoreBreakdown key={`${ward.wardId}:${factor.key}`} factor={factor} wardId={ward.wardId}/>}
           </>}
         </div> : <div role="tabpanel" id="zr-reports-panel" aria-labelledby="zr-reports-tab"><Suspense fallback={<div role="status" className="analytics-empty">Loading ward operations…</div>}><RankedWardReports key={ward.wardId} {...props} initialWardId={ward.wardId}/></Suspense></div>}
       </section>}
