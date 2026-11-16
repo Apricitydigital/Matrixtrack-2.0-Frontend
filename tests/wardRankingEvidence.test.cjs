@@ -19,6 +19,18 @@ test('module formulas preserve work denominators and target overrides',()=>{
  assert.equal(rankingFormula('workforce','deployment',{}),'');
 });
 
+test('cleanliness scoring exposes all four sources and the submitted-report denominator without SI/AI double credit',()=>{
+ const metrics={cleanlinessPolicy:'INSPECTION_20_CLEANLINESS_60_QUALITY_20',cleanlinessSiClean:4,cleanlinessSiNotClean:1,cleanlinessAiClean:3,cleanlinessAiNotClean:1,cleanlinessUnassessed:1,cleanlinessUnclear:0,cleanlinessClean:7,cleanlinessSubmitted:10,beatsChecked:10,beatsDue:20};
+ const evidence=rankingEvidence('beat',metrics);assert.deepEqual(evidence.primary.map(row=>row.label),['SI clean','SI not clean','AI suggested clean','AI suggested not clean']);
+ assert.equal(rankingFormula('beat','cleanliness',metrics),'SI clean + AI clean / submitted reports: 7 / 10');
+ assert.equal(rankingFormula('beat','inspectionCoverage',metrics),'Completed / required: 10 / 20');
+ assert.ok(evidence.additional.some(([key,value])=>key==='cleanlinessUnassessed'&&value===1));
+ require.extensions['.tsx']=(module,file)=>module._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.React,esModuleInterop:true}}).outputText,file);
+ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server'),{WardScoreBreakdown}=require('../src/components/analytics/WardScoreBreakdown.tsx');
+ const html=renderToStaticMarkup(React.createElement(WardScoreBreakdown,{factor:{key:'beat',label:'Sweeping',score:5.7,maxScore:10,metrics,components:{inspectionCoverage:{score:1,maxScore:2,percentage:50,applicable:true},cleanliness:{score:4.2,maxScore:6,percentage:70,applicable:true},completeBeatCoverage:{score:.5,maxScore:2,percentage:25,applicable:true}}}}));
+ assert.match(html,/Cleanliness \(SI \+ AI\)/);assert.match(html,/7 \/ 10/);assert.match(html,/4.2 \/ 6/);assert.match(html,/AI suggested not clean/);assert.match(html,/60% cleanliness/);
+});
+
 test('selected score exposes the exact active subtotal behind 19.86 and excludes N/A shift',()=>{
  const {scoreCalculation}=require('../src/services/wardRankingEvidence.ts');
  const result=scoreCalculation({components:{deployment:{score:11.67,maxScore:18,applicable:true},shiftCompliance:{score:0,maxScore:6,applicable:false},supervisorAvailability:{score:2.5,maxScore:3,applicable:true},unmannedBeatControl:{score:1.72,maxScore:3,applicable:true}}});

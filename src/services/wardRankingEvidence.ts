@@ -13,6 +13,10 @@ const beatFields:Record<string,[string,string]>={
 
 export function rankingEvidence(key:string,metrics:Record<string,unknown>) {
  const entries=Object.entries(metrics||{}).filter(([,v])=>typeof v==='boolean'||typeof v==='number'&&Number.isFinite(v));
+ if(metrics.cleanlinessPolicy==='INSPECTION_20_CLEANLINESS_60_QUALITY_20') {
+  const labels:Record<string,string>={cleanlinessSiClean:'SI clean',cleanlinessSiNotClean:'SI not clean',cleanlinessAiClean:'AI suggested clean',cleanlinessAiNotClean:'AI suggested not clean'};
+  return {primary:Object.entries(labels).filter(([id])=>metrics[id]!==undefined).map(([id,label])=>({id,label,value:metrics[id],help:id.startsWith('cleanlinessAi')?'Saved AI result is used only until SI decides. Each submitted report counts once.':'Recorded SI decision takes priority over AI.'})),additional:entries.filter(([id])=>!labels[id])};
+ }
  if(key==='workforce') {
   const primary=['matchedAttendance','present','manpowerScheduled','attendanceNotFound'];
   const labels:Record<string,string>={matchedAttendance:'Matched with attendance sheet',present:'Present',manpowerScheduled:'Registered attendance required',attendanceNotFound:'Attendance not found'};
@@ -50,6 +54,7 @@ export function rankingFormula(key:string,part:string,m:Record<string,any>) {
  const coverage:Record<string,[string,string]>={beat:['beatsChecked','beatsDue'],nala:['pointsChecked','pointsDue'],toilet:['toiletsChecked','toiletsDue'],litterBin:['binsChecked','binsDue'],gvp:['pointsChecked','pointsDue'],supervisor:['reportsSubmitted','reportsDue'],qc:['reviewed','totalReports'],actionOfficer:['tasksCompleted','tasksAssigned']};
  if(m.targetBased&&(part==='submissionCoverage'||part==='reviewCoverage'))return ratio('targetsMet','assignedTargets','Achieved / assigned targets');
  if(['inspectionCoverage','submissionCoverage','reviewCoverage','actionCompletion'].includes(part)&&coverage[key])return ratio(...coverage[key], 'Completed / required');
+ if(part==='cleanliness')return ratio('cleanlinessClean','cleanlinessSubmitted','SI clean + AI clean / submitted reports');
  if(part==='qcApproval')return ratio('qcApproved','qcReviewed','Approved / reviewed');
  if(part==='completePointCoverage')return ratio('completePointCoverage','pointsDue','Complete reports / required reports');
  if(part==='compliance')return key==='toilet'?ratio('compliantToilets','qcReviewed','Compliant / reviewed'):ratio('compliantBins','qcReviewed','Compliant / reviewed');
