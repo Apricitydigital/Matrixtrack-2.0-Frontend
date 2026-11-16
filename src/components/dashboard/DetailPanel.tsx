@@ -41,11 +41,11 @@ export function PanelActions({ actions }: { actions: { label: string; onClick: (
   return <div className="dp-actions">{actions.map(a => <button key={a.label} type="button" className={a.primary ? 'dp-primary' : ''} onClick={() => { panel?.close(); a.onClick(); }}>{a.label}<ArrowUpRight size={14} /></button>)}</div>;
 }
 /** Horizontal split bar (clean / not clean / unassessed, inspected / not inspected, …). */
-export function SplitBar({ parts, label }: { parts: { label: string; value: number; color: string }[]; label: string }) {
+export function SplitBar({ parts, label, legend = true }: { parts: { label: string; value: number; color: string }[]; label: string; legend?: boolean }) {
   const total = parts.reduce((n, p) => n + Math.max(0, p.value), 0);
   return <div className="dp-split" role="img" aria-label={`${label}: ${parts.map(p => `${p.label} ${p.value}`).join(', ')}`}>
     <div className="dp-split-bar">{total > 0 ? parts.filter(p => p.value > 0).map(p => <i key={p.label} style={{ width: `${p.value / total * 100}%`, background: p.color }} title={`${p.label}: ${p.value.toLocaleString('en-IN')}`} />) : <i style={{ width: '100%', background: 'var(--viz-track)' }} />}</div>
-    <div className="dp-split-key">{parts.map(p => <span key={p.label}><b style={{ background: p.color }} />{p.label} <em>{p.value.toLocaleString('en-IN')}</em></span>)}</div>
+    {legend && <div className="dp-split-key">{parts.map(p => <span key={p.label}><b style={{ background: p.color }} />{p.label} <em>{p.value.toLocaleString('en-IN')}</em></span>)}</div>}
   </div>;
 }
 export function PanelTable({ head, rows, empty = 'Nothing to show for this selection.' }: { head: string[]; rows: { key: string; cells: React.ReactNode[]; onClick?: () => void }[]; empty?: string }) {

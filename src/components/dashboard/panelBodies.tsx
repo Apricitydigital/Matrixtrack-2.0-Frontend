@@ -14,7 +14,7 @@ const nameOf = (rows: Named[], id: string, fallback: string) => rows.find(r => r
 const inScope = (scope: Scope) => (r: { module: string; zoneId: string; wardId: string }) => (!scope.module || r.module === scope.module) && (!scope.zone || r.zoneId === scope.zone) && (!scope.ward || r.wardId === scope.ward);
 
 export function CleanSplit({ stats }: { stats: CleanStats }) {
-  return <SplitBar label="Cleanliness" parts={[{ label: 'Clean', value: stats.clean, color: CLEAN_COLORS.clean }, { label: 'Not clean', value: stats.notClean, color: CLEAN_COLORS.notClean }, { label: 'AI analysing', value: stats.unassessed, color: CLEAN_COLORS.unassessed }]} />;
+  return <SplitBar label="Cleanliness" parts={[{ label: 'Clean', value: stats.clean, color: CLEAN_COLORS.clean }, { label: 'Not clean', value: stats.notClean, color: CLEAN_COLORS.notClean }, { label: 'AI analysing', value: stats.unassessed, color: CLEAN_COLORS.unassessed }]} legend={false} />;
 }
 
 /** Cleanliness of one scope: SI and AI split, AI agreement and the locations found not clean. */
@@ -24,18 +24,16 @@ export function CleanlinessDetail({ data, scope, wards, onOpen, onViewReport }: 
   for (const v of visits) { if (visitCleanliness(v).verdict !== 'not_clean') continue; const k = `${v.module}:${v.assetId || v.id}`, cur = latest.get(k); if (!cur || (v.submittedAt || '') > (cur.submittedAt || '')) latest.set(k, v); }
   return <>
     <PanelStats items={[
-      { label: 'Cleanliness', value: fmtPct(stats.percent), note: 'Clean share of assessed inspections', tone: stats.percent == null ? 'neutral' : stats.percent >= 80 ? 'green' : stats.percent >= 60 ? 'amber' : 'red' },
-      { label: 'Inspections', value: fmtNum(stats.inspections) },
+      { label: 'Cleanliness', value: fmtPct(stats.percent), note: `${fmtNum(stats.clean + stats.notClean)} assessed of ${fmtNum(stats.inspections)} inspections`, tone: stats.percent == null ? 'neutral' : stats.percent >= 80 ? 'green' : stats.percent >= 60 ? 'amber' : 'red' },
       { label: 'Clean', value: fmtNum(stats.clean), note: `SI ${fmtNum(stats.siClean)} · AI ${fmtNum(stats.aiClean)}`, tone: 'green' },
       { label: 'Not clean', value: fmtNum(stats.notClean), note: `SI ${fmtNum(stats.siNotClean)} · AI ${fmtNum(stats.aiNotClean)}`, tone: 'red' },
+      { label: 'AI analysing', value: fmtNum(stats.unassessed), note: 'No SI decision or AI result yet' },
     ]} />
     <CleanSplit stats={stats} />
     <PanelSection title="SI decisions and AI analysis" note="The SI decision is used where one was made. Reports still awaiting SI review use the saved AI suggestion; AI never overrides an SI decision.">
       <PanelStats items={[
         { label: 'SI cleanliness', value: fmtPct(stats.siPercent), note: `${fmtNum(stats.siClean + stats.siNotClean)} SI decisions` },
-        { label: 'AI suggestions used', value: fmtNum(stats.aiClean + stats.aiNotClean), note: 'Reports awaiting SI review' },
         { label: 'AI agrees with SI', value: fmtPct(ai.agreement), note: ai.compared ? `${fmtNum(ai.agreed)} of ${fmtNum(ai.compared)} compared` : 'No decided reports with AI analysis' },
-        { label: 'AI analysing', value: fmtNum(stats.unassessed), note: 'AI needs some time to assess' },
       ]} />
     </PanelSection>
     <PanelSection title="Locations found not clean" note={dirty.length ? 'Most frequent first.' : undefined}>
@@ -59,15 +57,16 @@ export function PendingList({ data, scope, wards, limit = 25 }: { data: Inspecti
 }
 
 /** Coverage for a scope: registered, inspected, not yet inspected, outside the register; by module and zone; pending list. */
-export function CoverageDetail({ data, modules, zones, wards, scope = {}, onOpen }: { data: InspectionCoverage; modules: OperationalModuleId[]; zones: Named[]; wards: Named[]; scope?: Scope; onOpen?: OpenReports }) {
+export function CoverageDetail({ data, modules, zones, wards, scope = {}, onOpen, between }: { data: InspectionCoverage; modules: OperationalModuleId[]; zones: Named[]; wards: Named[]; scope?: Scope; onOpen?: OpenReports; between?: React.ReactNode }) {
   data=useMemo(()=>({...data,visits:data.visits.filter(v=>inspectionStatus(v.status||'SUBMITTED')!=='unclassified')}),[data]);
   const c = coverageCounts(data, scope as any);
   const row = (label: string, s: Scope) => { const k = coverageCounts(data, s as any); return [label, fmtNum(k.total), fmtNum(k.covered), fmtNum(k.remaining), fmtPct(k.percent)]; };
   return <>
     <AssetCoverageStats counts={c} />
-    <SplitBar label="Asset coverage" parts={[{ label: 'Inspected', value: c.covered ?? 0, color: CLEAN_COLORS.inspected }, { label: 'Not yet inspected', value: c.remaining ?? 0, color: CLEAN_COLORS.pending }]} />
+    <SplitBar label="Asset coverage" parts={[{ label: 'Inspected', value: c.covered ?? 0, color: CLEAN_COLORS.inspected }, { label: 'Not yet inspected', value: c.remaining ?? 0, color: CLEAN_COLORS.pending }]} legend={false} />
     {!scope.module && <PanelSection title="By module"><PanelTable head={['Module', 'Registered', 'Inspected', 'Not yet inspected', 'Coverage']} rows={modules.map(m => ({ key: m, cells: row(MODULE_LABELS[m] || m, { ...scope, module: m }) }))} /></PanelSection>}
     {!scope.zone && !scope.ward && zones.length > 0 && <PanelSection title="By zone"><PanelTable head={['Zone', 'Registered', 'Inspected', 'Not yet inspected', 'Coverage']} rows={zones.map(z => ({ key: z.id, cells: row(z.name, { ...scope, zone: z.id }) }))} /></PanelSection>}
+    {between}
     <PanelSection title="Locations not yet inspected" note="Registered locations with no inspection in the selected dates."><PendingList data={data} scope={scope} wards={wards} /></PanelSection>
     {onOpen && <PanelActions actions={[{ label: 'Open completed inspections', primary: true, onClick: () => onOpen(scope, 'inspections_completed') }]} />}
   </>;

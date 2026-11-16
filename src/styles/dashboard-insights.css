@@ -305,7 +305,10 @@
 .inspection-module-cards.inspection-module-cards{align-items:stretch}
 .inspection-module-cards .inspection-module-card{display:flex;flex-direction:column}
 .inspection-module-cards .inspection-card-primary strong{min-height:42px;display:flex;align-items:center}
-.inspection-module-cards .inspection-card-status{align-content:start;min-height:96px}
+.inspection-module-cards .inspection-card-status{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;align-content:start}
+.inspection-module-cards .inspection-card-actions{padding-top:6px}
+.inspection-module-cards .inspection-entity-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}
+.inspection-module-cards .inspection-entity-metrics dt small{display:block;font-size:10.5px;font-weight:400;color:var(--muted)}
 .inspection-module-cards .module-ai-strip{margin-top:auto;min-height:78px;align-content:center}
 .inspection-module-cards .module-ai-strip+.module-pending{margin-top:10px}
 
@@ -331,3 +334,20 @@
 .zc-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 8px;font-size:11px;color:var(--muted)}
 .zc-foot b{color:var(--ink);font-variant-numeric:tabular-nums}
 .zc-details{display:inline-flex;align-items:center;font-weight:700;color:var(--di-blue)}
+
+/* Zone cards: single-line labels so every card lines up row by row */
+.zone-overview-grid{align-items:stretch}
+.zone-overview-card.zc{justify-content:space-between}
+.zc-progress>div:first-child span,.zc-progress small,.zc-grid dt,.zc-foot span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zc-progress small{display:block}
+.zc-grid>div{min-height:54px}
+.zc-grid>div[data-met=true] dd{font-size:15px}
+.zc-foot{flex-wrap:nowrap}
+.zc-foot>span:first-child{min-width:0}
+
+/* Filters inside the zone detail panel */
+.zd-filters{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 14px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface-soft)}
+.zd-filters label{display:grid;gap:3px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.zd-filters select{height:32px;min-width:160px;padding:0 10px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:13px}
+.zd-filters button{height:32px;padding:0 12px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--di-blue)}
+.zd-filters small{flex-basis:100%;font-size:11px;color:var(--muted)}
