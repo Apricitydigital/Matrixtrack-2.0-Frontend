@@ -14,3 +14,8 @@ export function wardRecordReason(records:number|null,completed:number|null,draft
  if(completed===0)return `${records} records exist, including ${drafts??'unavailable'} reports not yet submitted; no completed field visit is recorded.`;
  return `${completed} completed inspections are recorded. If the ward remains unassessed, check scoring eligibility, assignments and geography; do not describe this as no inspections.`;
 }
+
+/** Keeps real wards in their original order and moves reconciliation buckets such as "Not Matched Employees" to the end of any ward list or filter. */
+export function wardsLastAdministrative<T extends {name?:string;wardName?:string;backendName?:string}>(rows:T[]):T[] {
+ return [...rows.filter(isAdministrativeWard),...rows.filter(r=>!isAdministrativeWard(r))];
+}
