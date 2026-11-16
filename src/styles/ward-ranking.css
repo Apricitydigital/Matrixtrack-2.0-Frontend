@@ -13,3 +13,30 @@
 @media(max-width:850px){.wr-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.wr-overview-grid,.wr-opportunities-grid{grid-template-columns:1fr}.wr-heading-actions{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;width:100%}.wr-page .score-component-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.wr-zone-axis,.wr-zone-chart>button{grid-template-columns:120px minmax(0,1fr) 64px;gap:16px}.wr-priority-list strong{display:flex}.wr-priority-list strong small{margin:0}.wr-gap-chart b small{display:inline}.wr-page .compact-score-evidence{grid-template-columns:1fr;gap:22px}.wr-health-headline{padding-bottom:16px}}
 @media(max-width:520px){.wr-page{gap:16px}.wr-heading h1{font-size:29px}.wr-heading h1>span{font-size:14px}.wr-heading p{font-size:12px}.wr-kpis{gap:10px}.wr-kpis>article{padding:16px}.wr-kpis article>span{font-size:11px;gap:6px}.wr-kpis article>strong{font-size:30px;margin-top:13px}.wr-kpis article>p{font-size:10px}.wr-kpis strong small{font-size:11px}.wr-filters>label{flex-basis:100%}.wr-filters>select{flex:1;min-width:130px}.wr-filters{padding:12px}.wr-panel-heading{padding:20px 18px 16px}.wr-panel-heading h2{font-size:18px}.wr-zone-axis{padding-inline:18px}.wr-zone-axis,.wr-zone-chart>button{grid-template-columns:85px minmax(0,1fr) 43px;gap:10px}.wr-zone-chart{padding-inline:10px}.wr-zone-name strong{font-size:12px}.wr-zone-name small{font-size:9px}.wr-zone-value{gap:3px}.wr-zone-value strong{font-size:15px}.wr-zone-value svg{width:10px}.wr-chart-key{padding:14px 18px;gap:10px}.wr-chart-key small{width:100%;margin:0}.wr-health-headline,.wr-note{padding-inline:18px}.wr-band-strip{margin-inline:18px}.wr-gap-chart{padding-inline:18px}.wr-gap-chart b small{display:block}.wr-priority-list{padding-inline:12px}.wr-priority-list>button{gap:9px}.wr-priority-list strong{display:block}.wr-priority-list strong small{display:block;margin-top:4px}.wr-priority-list b{font-size:21px}.wr-priority-list>button>svg{width:13px}.wr-text-action{margin-inline:18px}.wr-detail>header{padding:22px 18px}.wr-detail>header h2{font-size:25px}.wr-detail .ward-final-score strong{font-size:28px}.wr-detail-toolbar{padding:18px 18px 0;flex-wrap:wrap}.wr-detail-toolbar>div:first-child{flex-basis:100%}.wr-page .score-component-grid{grid-template-columns:repeat(2,minmax(0,1fr));padding:18px;gap:8px}.wr-page .score-component-grid>button{padding:13px}.wr-page .score-component-grid strong{font-size:21px}.wr-page .compact-score-evidence,.wr-page .ward-exceptions{padding:18px}.wr-page .compact-score-table{font-size:11px}.wr-page .pagination-bar{padding-inline:14px}.wr-page .pagination-bar>div{flex-wrap:wrap}}
 @media(prefers-reduced-motion:reduce){.wr-page *{scroll-behavior:auto!important;transition:none!important}}
+
+/* Put the complete ward register first; keep long lists easy to scan. */
+.wr-register .wr-table-scroll{max-height:680px;overflow:auto;overscroll-behavior:contain}
+.wr-register .wr-table thead{position:sticky;top:0;z-index:2;background:var(--wr-soft)}
+.wr-register .wr-table th{font-size:11px;padding-block:16px}
+.wr-register .wr-table td{padding-block:18px}
+.wr-register .wr-ward-link{font-size:15px!important;font-weight:750!important;text-align:left}
+.wr-star-guide{display:flex;align-items:center;gap:8px;padding:0 24px 18px;margin:0;font-size:12px;line-height:1.7;color:var(--wr-muted)}
+.wr-star-guide>svg{color:#ab781b;flex-shrink:0;fill:#f7d67b}
+.wr-ward-name{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.wr-top-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border:1px solid #ecd694;border-radius:6px;background:#fff6d9;color:#815909;font-size:10px;font-weight:750;white-space:nowrap}
+.wr-top-badge svg{fill:#e8b745;color:#a4710a}
+.wr-page .wr-table .wr-top-ward{background:#fffcf2}
+.wr-page .wr-table .wr-top-ward:hover,.wr-page .wr-table .wr-top-ward.wr-selected-row{background:#fff6dc}
+.wr-top-ward .wr-rank{display:inline-grid;place-items:center;min-width:34px;min-height:32px;border-radius:8px;background:#f7e8b8;color:#7d570d;font-size:14px;font-weight:800}
+.wr-top-ward .wr-table-score strong{font-size:18px;font-weight:800}
+.wr-page .wr-distribution{display:grid;grid-template-columns:1fr 1fr;align-items:center}
+.wr-page .wr-distribution .wr-panel-heading{grid-column:1/-1}
+.wr-page .wr-distribution .wr-health-headline{grid-row:2/4}
+.wr-page .wr-distribution .wr-band-strip{margin-top:8px}
+.wr-page .wr-distribution .wr-note{grid-column:1/-1}
+[data-theme=dark] .wr-page .wr-table .wr-top-ward,.dark .wr-page .wr-table .wr-top-ward{background:#343629}
+[data-theme=dark] .wr-page .wr-table .wr-top-ward:hover,[data-theme=dark] .wr-page .wr-table .wr-top-ward.wr-selected-row,.dark .wr-page .wr-table .wr-top-ward:hover,.dark .wr-page .wr-table .wr-top-ward.wr-selected-row{background:#46432a}
+[data-theme=dark] .wr-top-badge,.dark .wr-top-badge{background:#463c20;color:#f6d98b;border-color:#756131}
+[data-theme=dark] .wr-top-ward .wr-rank,.dark .wr-top-ward .wr-rank{background:#5a4925;color:#ffe19a}
+@media(max-width:600px){.wr-register .wr-table-scroll{max-height:600px}.wr-star-guide{padding-inline:18px;align-items:flex-start;font-size:11px}.wr-page .wr-distribution{display:block}.wr-register .wr-ward-link{font-size:14px!important}}
+@media print{.wr-register .wr-table-scroll{max-height:none;overflow:visible}.wr-register .wr-table{min-width:0}.wr-register .wr-table thead{position:static}.wr-top-badge{print-color-adjust:exact}}

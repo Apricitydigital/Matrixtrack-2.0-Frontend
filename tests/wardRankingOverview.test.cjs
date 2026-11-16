@@ -23,10 +23,10 @@ test('component opportunities use only assessed applicable wards, including zero
  assert.equal(result.gaps.find(g=>g.key==='workforce').gap,55/3);
  assert.equal(wardRankingOverview([]).average,null);assert.equal(wardRankingOverview([]).best,undefined);
 });
-test('loaded, loading, empty and error views render with accessible linear comparisons and no radial gauges',()=>{
+test('ward list precedes diagnostics, highlights official top ranks and renders loading and error states',()=>{
  const props={city:{id:'test',name:'Ujjain'},rows:[row('1',10),row('2',20)],config:{thresholds:{greenMinScore:85,amberMinScore:70}},loading:false,error:'',onRetry:()=>{}};
  const html=renderToStaticMarkup(React.createElement(WardRankingInsights,props));
- assert.match(html,/How the zones compare/);assert.match(html,/role="meter"/);assert.match(html,/aria-valuenow="15"/);assert.match(html,/Where marks are being lost/);assert.match(html,/Start with these wards/);
+ assert.match(html,/All wards, ranked/);assert.doesNotMatch(html,/How the zones compare|wr-zone-chart/);assert.match(html,/City top 1/);assert.match(html,/City top 2/);assert.ok(html.indexOf('WARD COMPARISON')<html.indexOf('PERFORMANCE HEALTH'));assert.match(html,/Where marks are being lost/);assert.match(html,/Start with these wards/);
  assert.ok(html.indexOf('WARD COMPARISON')<html.indexOf('WARD DEEP DIVE'));assert.doesNotMatch(html,/viz-gauge|insight-donut-chart/);
  assert.match(renderToStaticMarkup(React.createElement(WardRankingInsights,{...props,rows:[]})),/No wards match this view/);
  const loading=renderToStaticMarkup(React.createElement(WardRankingInsights,{...props,loading:true}));
@@ -43,11 +43,23 @@ test('zone, band and search interactions keep summaries and register in the same
  try{
   React.useState=initial=>{const at=index++;if(!(at in slots))slots[at]=typeof initial==='function'?initial():initial;return[slots[at],v=>{slots[at]=typeof v==='function'?v(slots[at]):v;}];};React.useMemo=fn=>fn();React.useRef=()=>({current:null});
   let tree=render();nodes(tree).find(n=>n.props?.['aria-label']==='Ranking zone').props.onChange({target:{value:'z2'}});tree=render();
-  let html=renderToStaticMarkup(tree);assert.match(html,/aria-valuenow="90"/);assert.doesNotMatch(html,/Explain score for Ward 1/);
+  let html=renderToStaticMarkup(tree);assert.match(html,/Explain score for Ward 2/);assert.doesNotMatch(html,/Explain score for Ward 1/);
   nodes(tree).find(n=>n.props?.className==='wr-reset').props.onClick();tree=render();nodes(tree).find(n=>n.props?.['aria-label']==='Ranking RYG band').props.onChange({target:{value:'neutral'}});tree=render();
   html=renderToStaticMarkup(tree);assert.match(html,/Awaiting assessment/);assert.doesNotMatch(html,/aria-valuenow=/);
   nodes(tree).find(n=>n.props?.className==='wr-reset').props.onClick();tree=render();nodes(tree).find(n=>n.props?.['aria-label']==='Search wards').props.onChange({target:{value:'Ward 2'}});tree=render();
   html=renderToStaticMarkup(tree);assert.match(html,/Explain score for Ward 2/);assert.doesNotMatch(html,/Explain score for Ward 1/);
   nodes(tree).find(n=>n.props?.['aria-label']==='Ranking ward').props.onChange({target:{value:'2'}});assert.doesNotThrow(render);
  }finally{Object.assign(React,originals);Object.assign(matrixStore,saved);}
+});
+
+
+test('all wards are visible without pagination and top badges use official ranks rather than filtered position',()=>{
+ const rows=Array.from({length:54},(_,i)=>row(String(i+1),54-i));
+ const props={city:{id:'test',name:'City'},rows,config:null,loading:false,error:'',onRetry:()=>{}};
+ const html=renderToStaticMarkup(React.createElement(WardRankingInsights,props));
+ assert.equal((html.match(/aria-label="Explain score for Ward /g)||[]).length,54);
+ assert.doesNotMatch(html,/wards pagination|How the zones compare/);
+ assert.equal((html.match(/class="wr-top-badge"/g)||[]).length,3);
+ const filtered=renderToStaticMarkup(React.createElement(WardRankingInsights,{...props,rows:[row('8',90),row('2',null,'z1',{rankable:false})]}));
+ assert.doesNotMatch(filtered,/class="wr-top-badge"/);
 });
