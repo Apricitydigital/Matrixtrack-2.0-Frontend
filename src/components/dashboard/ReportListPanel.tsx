@@ -6,7 +6,7 @@ import { INTELLIGENCE_LABELS, matchesIntelligence } from '../../services/intelli
 import { MODULE_LABELS } from '../../services/presentation';
 import { PanelActions, PanelSection, PanelStats, PanelTable, fmtNum, fmtPct } from './DetailPanel';
 
-type Named = { id: string; name: string };
+type Named = { id: string; name: string; zoneId?: string };
 const unique = (visits: InspectionVisit[]) => [...new Map(visits.map(v => [v.id, v])).values()];
 const asRecord = (v: InspectionVisit) => ({ ...v.raw, status: v.raw?.workspaceStatus || v.status });
 
@@ -21,8 +21,9 @@ export function reportsFor(data: InspectionCoverage, filter: string): Inspection
   return all.filter(v => inspectionDisplayStatus(v.status) === filter);
 }
 
-export function ReportListPanel({ data, filter, wards, note, onViewReport, onOpenAll }: { data: InspectionCoverage; filter: string; wards: Named[]; note?: string; onViewReport?: (visit: InspectionVisit) => void; onOpenAll?: () => void }) {
-  const rows = useMemo(() => reportsFor(data, filter).sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || '')), [data, filter]);
+export function ReportListPanel({ data, filter, wards, zones, note, onViewReport, onOpenAll }: { data: InspectionCoverage; filter: string; wards: Named[]; zones?: Named[]; note?: string; onViewReport?: (visit: InspectionVisit) => void; onOpenAll?: () => void }) {
+  const [zone, setZone] = useState(''), [ward, setWard] = useState('');
+  const rows = useMemo(() => reportsFor(data, filter).filter(v => (!zone || v.zoneId === zone) && (!ward || v.wardId === ward)).sort((a, b) => (b.submittedAt || '').localeCompare(a.submittedAt || '')), [data, filter, zone, ward]);
   const total = unique(data.visits).length;
   const [module, setModule] = useState('');
   const [shown, setShown] = useState(15);
@@ -30,7 +31,14 @@ export function ReportListPanel({ data, filter, wards, note, onViewReport, onOpe
   const byModule = useMemo(() => { const m = new Map<string, number>(); rows.forEach(v => m.set(v.module, (m.get(v.module) || 0) + 1)); return m; }, [rows]);
   const list = module ? rows.filter(v => v.module === module) : rows;
   const showAi = filter === 'pending_review' || filter.startsWith('intelligence_');
+  const wardOptions = wards.filter(w => !zone || w.zoneId === zone);
   return <>
+    {(Boolean(zones?.length) || wards.length > 1) && <div className="zd-filters" role="group" aria-label="Filters for this panel only">
+      {Boolean(zones?.length) && <label>Zone<select value={zone} onChange={e => { const z = e.target.value; setZone(z); if (z && ward && !wards.some(w => w.id === ward && w.zoneId === z)) setWard(''); setShown(15); }}><option value="">All zones</option>{zones!.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}</select></label>}
+      <label>Ward<select value={ward} onChange={e => { setWard(e.target.value); setShown(15); }}><option value="">All wards</option>{wardOptions.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}</select></label>
+      {(zone || ward) && <button type="button" onClick={() => { setZone(''); setWard(''); setShown(15); }}>Clear filters</button>}
+      <small>Narrows the dashboard selection. Only this panel changes.</small>
+    </div>}
     <PanelStats items={[{ label: 'Reports', value: fmtNum(rows.length), note: total ? `${fmtPct(rows.length / total * 100)} of all inspections` : undefined, tone: 'blue' }, ...[...byModule].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([m, n]) => ({ label: MODULE_LABELS[m as keyof typeof MODULE_LABELS] || m, value: fmtNum(n) }))]} />
     {note && <p className="dp-empty" style={{ textAlign: 'left' }}>{note}</p>}
     <PanelSection title="Reports" note={rows.length ? 'Newest first. View report opens the full report with photos and remarks.' : undefined}>

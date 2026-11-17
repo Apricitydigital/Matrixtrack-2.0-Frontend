@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { ScopedPanel } from './ScopedPanel';
 import { Sparkles, Sprout, Trophy } from 'lucide-react';
 import type { InspectionCoverage, InspectionVisit } from '../../services/inspectionCoverage';
 import { cleanlinessBy, cleanlinessOverview, cleanlinessStats, type CleanStats } from '../../services/cleanliness';
@@ -90,7 +91,7 @@ export function CleanlinessInsights({ data, loading, modules, zones, wards, onOp
   const bestZone = strongest(zones.map(z => ({ label: z.name, s: allZones.get(z.id) })));
 
 
-  const show = (title: string, subtitle: string, scope: Scope) => panel?.open({ title, subtitle, body: <CleanlinessDetail data={data} scope={scope} wards={wards} onOpen={onOpen} onViewReport={onViewReport} /> });
+  const show = (title: string, subtitle: string, scope: Scope) => panel?.open({ title, subtitle, body: <ScopedPanel zones={zones} wards={wards} modules={modules} initial={scope}>{s => <CleanlinessDetail data={data} scope={s as Scope} wards={wards} onOpen={onOpen} onViewReport={onViewReport} />}</ScopedPanel> });
   const headline = loading ? 'Loading…' : city.percent == null ? 'No clean / not clean result yet' : `${fmtPct(city.percent)} of inspected places are clean`;
 
   return <section className="home-section cz" aria-label="Cleanliness insights">
