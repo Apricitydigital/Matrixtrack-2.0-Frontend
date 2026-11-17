@@ -81,7 +81,16 @@ export function ReportsExportsVisual({city, zones, wards, reports: _reports}:{ci
   }, [city.id]);
   const people = matrixStore.getCollection('users'), personnelComplete = people.status === 'ready' && !people.hasMore, users = matrixStore.getUsers(city.id);
 
-  const zoneLabel = focusSel?.active ? focusSel.label : selectedWards.length ? `${selectedWards.length} ward${selectedWards.length === 1 ? '' : 's'}` : selectedZones.length ? (selectedZones.length === cityZones.length ? 'All zones' : cityZones.filter(z => selectedZones.includes(z.id)).map(z => z.name).join(', ')) : 'All zones and wards';
+  // A short scope name for headings: never a list of every ward.
+  const plural = (n:number, word:string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const wardZoneCount = new Set(wards.filter(w => selectedWards.includes(w.id)).map(w => w.zoneId)).size;
+  const zoneLabel = focusSel?.active ? focusSel.label
+    : selectedWards.length === 1 ? (wards.find(w => w.id === selectedWards[0])?.name || '1 ward')
+    : selectedWards.length ? `${plural(selectedWards.length, 'ward')} · ${plural(wardZoneCount, 'zone')}`
+    : !selectedZones.length ? 'Whole city'
+    : selectedZones.length === cityZones.length ? `All ${plural(cityZones.length, 'zone')}`
+    : selectedZones.length <= 2 ? cityZones.filter(z => selectedZones.includes(z.id)).map(z => z.name).join(' & ')
+    : plural(selectedZones.length, 'zone');
   const moduleLabel = selectedModules.length ? selectedModules.map(id => MODULE_LABELS[id as keyof typeof MODULE_LABELS] || id).join(', ') : 'All modules';
   const ctx = (generated:string, scope:string, f = from, t = to):DocContext => ({city: city.name, from: f, to: t, generated, scope, role: ROLE_LABELS[matrixStore.currentUser?.role || 'COMMISSIONER'], brand: REPORT_BRAND});
 
@@ -93,14 +102,14 @@ export function ReportsExportsVisual({city, zones, wards, reports: _reports}:{ci
       const pulse = {...loadedPulse, official: official && loadedPulse.performance?.SUPERVISOR ? applyPerformanceTargets(official, loadedPulse.performance.SUPERVISOR, selectedWards, selectedModules) : official};
       const input = {city: scopeCity, from, to, zone: selectedZones.length === 1 ? selectedZones[0] : '', ward: selectedWards.length === 1 ? selectedWards[0] : '', zones, wards, users, selectedZoneIds: selectedZones, selectedWardIds: selectedWards, coverage, pulse};
       const report = commissionerReportData({...input, personnelComplete});
-      const model = cityReportModel({report, coverage, pulse, zones: cityZones, zone: input.zone, ward: input.ward, selectedZoneIds: selectedZones, selectedWardIds: selectedWards});
-      return {state: 'ready' as const, input, report, model, html: cityReportDocument(model, ctx(stamp(), `${report.scope} · ${moduleLabel}`))};
+      const model = cityReportModel({report, coverage, pulse, zones: cityZones, wards: wards.filter(w => w.cityId === city.id).map(w => ({id: w.id, name: w.name})), zone: input.zone, ward: input.ward, selectedZoneIds: selectedZones, selectedWardIds: selectedWards});
+      return {state: 'ready' as const, input, report, model, html: cityReportDocument(model, ctx(stamp(), moduleLabel === 'All modules' ? zoneLabel : `${zoneLabel} · ${moduleLabel}`))};
     } catch (e) { return {state: 'error' as const, message: e instanceof Error ? e.message : 'The summary could not be built.'}; }
   }, [loading, coverage, loadedPulse, scopeKey, personnelComplete, users.length]);
 
   const zoneDoc = useMemo(() => {
     if (!data) return null;
-    try { return {html: zoneReportDocument(data, ctx(stamp(), `${zoneLabel} · ${moduleLabel}`, data.range?.from || from, data.range?.to || to)), zones: (data.zones || []).length}; }
+    try { return {html: zoneReportDocument(data, ctx(stamp(), moduleLabel === 'All modules' ? zoneLabel : `${zoneLabel} · ${moduleLabel}`, data.range?.from || from, data.range?.to || to)), zones: (data.zones || []).length}; }
     catch (e) { return {error: e instanceof Error ? e.message : 'The zone report could not be built.'}; }
   }, [data]);
 
@@ -169,42 +178,42 @@ export function ReportsExportsVisual({city, zones, wards, reports: _reports}:{ci
     </div>
 
     <nav className="rx-tabs" role="tablist" aria-label="Report type">
-      {([['summary', 'City summary', LayoutGrid, 'KPIs, service delivery, trends, ward scores'], ['zones', 'Zone-wise report', FileText, 'Overview + one page per zone'], ['evidence', 'Evidence pack', Images, 'Photos, decisions & timeline']] as const).map(([id, label, Icon, hint]) =>
+      {([['summary', 'City summary', LayoutGrid, 'Cleanliness first, then inspection delivery'], ['zones', 'Zone-wise report', FileText, 'Cleanliness overview + one page per zone'], ['evidence', 'Evidence pack', Images, 'Photos, decisions & timeline']] as const).map(([id, label, Icon, hint]) =>
         <button key={id} role="tab" aria-selected={tab === id} data-on={tab === id} onClick={() => setTab(id)}><Icon size={17}/><span><b>{label}</b><small>{hint}</small></span></button>)}
     </nav>
 
     {tab === 'summary' && <div className="rx-panel">
       <div className="rx-toolbar">
-        <div><strong>Inspection summary report</strong><small>{zoneLabel} · {moduleLabel} · 2 pages, A4 landscape</small></div>
+        <div><strong>Cleanliness &amp; inspection summary</strong><small>{zoneLabel} · {moduleLabel} · 3 pages: cleanliness, inspection delivery, performance · A4 landscape</small></div>
         <div className="rx-actions">
-          <button className="rx-primary" disabled={summary.state !== 'ready'} onClick={() => summary.state === 'ready' && printDocument(`${city.name} · Inspection Summary Report`, summary.html)}><Printer size={15}/>Download PDF</button>
+          <button className="rx-primary" disabled={summary.state !== 'ready'} onClick={() => summary.state === 'ready' && printDocument(`${city.name} · Cleanliness & Inspection Summary`, summary.html)}><Printer size={15}/>Download PDF</button>
           <button disabled={summary.state !== 'ready' || exporting || !personnelComplete} onClick={downloadExcel} title={personnelComplete ? undefined : 'Waiting for the complete personnel directory'}>{exporting ? <Loader2 size={15} className="rx-spin"/> : <FileSpreadsheet size={15}/>}Excel</button>
           <button disabled={summary.state !== 'ready'} onClick={downloadCsvFile}><Download size={15}/>CSV</button>
         </div>
       </div>
       {(exportMessage || peopleError) && <p className="rx-note" role="status">{exportMessage || peopleError}</p>}
       {m && <div className="rx-glance">
-        <div><span>Inspections completed</span><b>{m.achieved?.toLocaleString('en-IN') ?? '—'}</b></div>
-        <div><span>Target progress</span><b>{m.progress == null ? '—' : `${m.progress.toLocaleString('en-IN', {maximumFractionDigits: 1})}%`}</b></div>
-        <div><span>Asset coverage</span><b>{m.coverage == null ? '—' : `${m.coverage.toLocaleString('en-IN', {maximumFractionDigits: 1})}%`}</b></div>
-        <div><span>Fields with source data</span><b>{m.available} / {m.totalFacts}</b></div>
+        <div><span>Cleanliness rate</span><b>{m.clean.rate == null ? '—' : `${m.clean.rate.toLocaleString('en-IN', {maximumFractionDigits: 1})}%`}</b></div>
+        <div><span>Cleaned · not cleaned</span><b>{(m.clean.totals.cleaned ?? 0).toLocaleString('en-IN')} · {(m.clean.totals.notCleaned ?? 0).toLocaleString('en-IN')}</b></div>
+        <div><span>Awaiting SI review</span><b>{m.clean.totals.siPending?.toLocaleString('en-IN') ?? '—'}</b></div>
+        <div><span>Inspection target progress</span><b>{m.progress == null ? '—' : `${m.progress.toLocaleString('en-IN', {maximumFractionDigits: 1})}%`}</b></div>
       </div>}
       {summary.state === 'loading' && <div className="rx-skeleton"><Loader2 size={20} className="rx-spin"/>Loading the complete inspection register…</div>}
       {summary.state === 'error' && <div className="rx-error"><AlertTriangle size={18}/>{summary.message}</div>}
-      {summary.state === 'ready' && <ReportFrame html={summary.html} title="Inspection summary preview"/>}
+      {summary.state === 'ready' && <ReportFrame html={summary.html} title="Cleanliness and inspection summary preview"/>}
       <IntelligenceSummary reports={selected} loading={rawCoverage.loading} unavailable={coverage.failedModules.length > 0}/>
     </div>}
 
     {tab === 'zones' && <div className="rx-panel">
       <div className="rx-toolbar">
-        <div><strong>Zone-wise inspection report</strong><small>{selectedZones.length ? `${zoneLabel} · ${moduleLabel}` : 'Choose at least one zone above'}{zoneDoc && 'zones' in zoneDoc ? ` · ${zoneDoc.zones + 1} pages, A4 landscape` : ''}</small></div>
+        <div><strong>Zone-wise cleanliness report</strong><small>{selectedZones.length ? `${zoneLabel} · ${moduleLabel}` : 'Choose at least one zone above'}{zoneDoc && 'zones' in zoneDoc ? ` · ${zoneDoc.zones + 1} pages, A4 landscape` : ''}</small></div>
         <div className="rx-actions">
           <button disabled={busy || !selectedZones.length} onClick={generate}>{busy ? <Loader2 size={15} className="rx-spin"/> : data ? <RefreshCw size={15}/> : <FileBarChart size={15}/>}{busy ? 'Preparing…' : data ? 'Regenerate' : 'Generate report'}</button>
-          <button className="rx-primary" disabled={!zoneDoc || !('html' in zoneDoc)} onClick={() => zoneDoc && 'html' in zoneDoc && printDocument(`${city.name} · Zone-wise Inspection Report`, zoneDoc.html!)}><Printer size={15}/>Download PDF</button>
+          <button className="rx-primary" disabled={!zoneDoc || !('html' in zoneDoc)} onClick={() => zoneDoc && 'html' in zoneDoc && printDocument(`${city.name} · Zone-wise Cleanliness Report`, zoneDoc.html!)}><Printer size={15}/>Download PDF</button>
         </div>
       </div>
       {error && <div className="rx-error" role="alert"><AlertTriangle size={18}/>{error}</div>}
-      {!selectedZones.length && <div className="rx-empty"><MapPin size={26}/><h3>Pick the zones to report on</h3><p>Use “Select all” for a city-wide zone report. You get an overview page, then one page per zone with targets, outcomes and ward scores.</p><button onClick={() => { setSelectedZones(cityZones.map(z => z.id)); setSelectedWards([]); }}>Select all zones</button></div>}
+      {!selectedZones.length && <div className="rx-empty"><MapPin size={26}/><h3>Pick the zones to report on</h3><p>Use “Select all” for a city-wide zone report. You get a cleanliness overview, then one page per zone with SI verdicts, AI suggestions, targets and ward scores.</p><button onClick={() => { setSelectedZones(cityZones.map(z => z.id)); setSelectedWards([]); }}>Select all zones</button></div>}
       {selectedZones.length > 0 && !data && !busy && !error && <div className="rx-empty"><FileBarChart size={26}/><h3>Ready to generate</h3><p>{zoneLabel} · {moduleLabel} · {from === to ? from : `${from} to ${to}`}</p><button onClick={generate}>Generate report</button></div>}
       {busy && <div className="rx-skeleton"><Loader2 size={20} className="rx-spin"/>Collecting targets, outcomes and ward scores…</div>}
       {zoneDoc && 'error' in zoneDoc && <div className="rx-error"><AlertTriangle size={18}/>{zoneDoc.error}</div>}

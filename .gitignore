@@ -16,3 +16,4 @@ backend-patches/check-superadmin-backend.cjs
 *.log
 .env*
 !.env.example
+15_ward_report/
