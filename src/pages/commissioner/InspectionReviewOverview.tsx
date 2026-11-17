@@ -23,13 +23,13 @@ const AI_ROWS = [
  * One container for the review pipeline: where every inspection stands, how much SI review is done against target,
  * what the AI suggests for reports still awaiting SI, and the action follow-up. Each figure appears once.
  */
-export function InspectionReviewOverview({ cityId, pulse, data, loading, zoneIds = [], wardIds = [], revision = 0, wards = [], scopeText = '', onInspect, onViewReport }: {
+export function InspectionReviewOverview({ cityId, pulse, data, loading, zoneIds = [], wardIds = [], revision = 0, wards = [], zones, scopeText = '', onInspect, onViewReport }: {zones?: { id: string; name: string }[];
   cityId: string; pulse: CityPulse; data: InspectionCoverage; loading: boolean; zoneIds?: string[]; wardIds?: string[]; revision?: number;
   wards?: { id: string; name: string }[]; scopeText?: string; onInspect: (module?: string, status?: string) => void; onViewReport?: (visit: InspectionVisit) => void;
 }) {
   const panel = usePanel();
   /** Opens the reports behind a figure in the side panel; falls back to the full list page only when no panel exists. */
-  const open = (filter: string, title: string, note?: string) => panel ? panel.open({ title, subtitle: scopeText || 'Selected dates and area', width: '3xl', body: <ReportListPanel data={data} filter={filter} wards={wards} note={note} onViewReport={onViewReport} onOpenAll={() => onInspect(undefined, filter)} /> }) : onInspect(undefined, filter);
+  const open = (filter: string, title: string, note?: string) => panel ? panel.open({ title, subtitle: scopeText || 'Selected dates and area', width: '3xl', body: <ReportListPanel data={data} filter={filter} wards={wards} zones={zones} note={note} onViewReport={onViewReport} onOpenAll={() => onInspect(undefined, filter)} /> }) : onInspect(undefined, filter);
   // SI review outcome: every inspection is exactly one of Cleaned, Not cleaned or Pending, so the three always add up to the total.
   // Reports later sent to ULB / IEC were first marked Not cleaned by the SI, so they stay in Not cleaned here and are tracked in the action row.
   const si = useMemo(() => {
