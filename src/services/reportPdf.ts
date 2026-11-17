@@ -30,6 +30,8 @@ export const STATUS = [
   {key: 'escalated', id: 'escalated', label: 'Escalated', color: C.violet},
 ] as const;
 const progressColor = (p:number | null) => p == null ? C.grey : p >= 100 ? C.green : p >= 60 ? C.aqua : p >= 30 ? C.blue : C.orange;
+/** Cleanliness rate (share of SI-checked reports found clean). */
+export const cleanColor = (p:number | null) => p == null ? C.grey : p >= 90 ? C.green : p >= 75 ? C.aqua : p >= 50 ? C.amber : C.red;
 const inkOn = (fill:string) => fill === C.amber ? '#1b1b1b' : '#ffffff';
 
 /* ---------- chart primitives (strings; literal colours; explicit sizes) ---------- */
@@ -81,6 +83,24 @@ ${[0, .5, 1].map(f => `<line x1="${L}" x2="${w - R}" y1="${y(peak * f)}" y2="${y
 <path d="${line}L${x(points.length - 1)},${y(0)}L${x(0)},${y(0)}Z" fill="url(#ag)"/><path d="${line}" fill="none" stroke="${C.blue}" stroke-width="2" stroke-linejoin="round"/>
 <line x1="${L}" x2="${w - R}" y1="${y(avg)}" y2="${y(avg)}" stroke="${C.orange}" stroke-width="1.2" stroke-dasharray="5 4"/><text x="${w - R}" y="${y(avg) - 4}" text-anchor="end" font-size="9" fill="${C.orange}">avg ${esc(num(avg))}/day</text>
 ${[0, mid, points.length - 1].map(i => `<text x="${x(i)}" y="${h - 8}" text-anchor="${i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle'}" font-size="9.5" fill="${C.muted}">${esc(points[i].label)}</text>`).join('')}</svg>`;
+}
+/** Stacked daily columns (e.g. cleaned / issues / awaiting review per day). */
+export function stackCols(points:{label:string;parts:number[]}[], series:{label:string;color:string}[], w = 520, h = 160) {
+  if (points.length < 2) return `<p class="empty">A trend needs at least two days in the selected range.</p>`;
+  const peak = Math.max(1, ...points.map(p => p.parts.reduce((s, v) => s + v, 0))), L = 36, R = 8, T = 10, B = 24, step = (w - L - R) / points.length, cw = Math.max(2, Math.min(18, step * .72));
+  const y = (v:number) => T + (1 - v / peak) * (h - T - B);
+  const grid = [0, .5, 1].map(f => `<line x1="${L}" x2="${w - R}" y1="${y(peak * f)}" y2="${y(peak * f)}" stroke="${C.line}" stroke-dasharray="3 4"/><text x="${L - 5}" y="${y(peak * f) + 3.5}" text-anchor="end" font-size="9" fill="${C.axis}">${esc(num(peak * f))}</text>`).join('');
+  const cols = points.map((p, i) => { let base = 0; const x = L + step * i + (step - cw) / 2;
+    return p.parts.map((v, k) => { if (!(v > 0)) return ''; const top = y(base + v), r = `<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${cw.toFixed(1)}" height="${(y(base) - top).toFixed(1)}" fill="${series[k].color}"/>`; base += v; return r; }).join(''); }).join('');
+  const mid = Math.floor((points.length - 1) / 2);
+  const labels = [0, mid, points.length - 1].map(i => `<text x="${L + step * i + step / 2}" y="${h - 8}" text-anchor="${i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle'}" font-size="9.5" fill="${C.muted}">${esc(points[i].label)}</text>`).join('');
+  return `<svg width="100%" viewBox="0 0 ${w} ${h}" role="img" aria-label="Daily cleanliness verdicts">${grid}${cols}${labels}</svg>
+<div class="keys">${series.map(s => `<span><i style="background:${s.color}"></i>${esc(s.label)}</span>`).join('')}</div>`;
+}
+/** One row per group: label, verdict stack, cleanliness rate. */
+export function rateRows(rows:{label:string;items:{label:string;value:number | null | undefined;color:string}[];rate:number | null;sub:string}[]) {
+  if (!rows.length) return `<p class="empty">No SI decisions in this scope yet.</p>`;
+  return `<div class="rrows">${rows.map(r => `<div><span class="lbl" title="${esc(r.label)}">${esc(r.label)}<small>${esc(r.sub)}</small></span>${stack(r.items)}<b style="color:${cleanColor(r.rate)}">${r.rate == null ? '—' : `${Math.round(r.rate)}%`}</b></div>`).join('')}</div>`;
 }
 export const bar = (p:number | null, color?:string) => `<div class="bar"><i style="width:${p == null ? 0 : clamp(p).toFixed(1)}%;background:${color || progressColor(p)}"></i></div>`;
 export function stack(items:{label:string;value:number | null | undefined;color:string}[]) {
@@ -157,6 +177,13 @@ td.pb{min-width:110px}td.pb .bar{display:inline-block;width:60px;vertical-align:
 .complete>div{display:grid;grid-template-columns:170px 1fr 36px;gap:8px;align-items:center;margin:3px 0;font-size:10px}.complete .cells{display:flex;gap:2px}.complete .cells i{flex:1;height:9px;border-radius:2px;background:${C.track}}.complete .cells i.on{background:${C.blue}}.complete b{text-align:right;color:${C.muted}}
 .complete.narrow>div{grid-template-columns:1fr 34px;gap:1px 8px;margin:0 0 5px}.complete.narrow>div>span:first-child{grid-column:1/-1}
 .officers{display:grid;gap:4px}.officers div{display:grid;grid-template-columns:1fr 60px;gap:0 10px;padding:4px 9px;border-radius:7px;background:#f4f8fb}.officers b{text-align:right}.officers small{grid-column:1/-1;color:${C.muted};font-size:9.5px}
+.hero{display:flex;align-items:center;gap:14px;padding:6px 4px}.hero span{display:block;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:${C.muted}}.hero b{display:block;font-size:26px;line-height:1.1;color:var(--c)}.hero small{display:block;font-size:9.5px;color:${C.muted};max-width:150px}
+.herogrid{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center}.facts.mini{grid-template-columns:repeat(2,1fr);gap:5px}.facts.mini div{padding:4px 8px}.facts.mini b{font-size:13px}
+.rrows{display:grid;gap:4px}.rrows>div{display:grid;grid-template-columns:112px 1fr 38px;align-items:center;gap:8px;font-size:10.5px;line-height:1.2}.rrows .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}.rrows .lbl small{display:block;font-weight:400;font-size:8.5px;color:${C.muted}}.rrows b{text-align:right;font-size:12px}
+.wtab td,.wtab th{padding:2.5px 6px}.wtab td.pb{min-width:84px}.wtab td.pb .bar{width:36px}.wtab td:first-child{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ai{margin-top:6px;padding:6px 9px;border-radius:7px;background:#f4f8fb;font-size:10px;color:${C.muted}}.ai b{color:${C.ink}}
+thead tr.grp th{background:#24597a;font-size:9.5px;text-align:center;padding:3px 7px}thead tr.grp th.c{background:#0b7a36}
+td.sep,th.sep{border-left:2px solid ${C.line}}
 @page{size:A4 landscape;margin:9mm}
 @media print{body{background:#fff}.page{max-width:none;margin:0;border-radius:0;box-shadow:none;padding-bottom:0;break-after:page}.page:last-child{break-after:auto}}
 `;
@@ -168,7 +195,9 @@ export function band(ctx:DocContext, title:string, crumb:string) {
 }
 export const foot = (ctx:DocContext, label:string) => `<div class="foot"><span>${esc(ctx.brand)} · ${esc(label)}</span><span>Generated ${esc(ctx.generated)} IST</span></div>`;
 export const kpi = (label:string, value:string, color:string = C.navy, sub = '') => `<div class="kpi" style="--c:${color}"><span>${esc(label)}</span><b>${esc(value)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
-export const kpiRing = (label:string, p:number | null, sub:string) => `<div class="kpi ringed" style="--c:${progressColor(p)}">${ring(p, 50, undefined, label)}<div><span>${esc(label)}</span><small>${esc(sub)}</small></div></div>`;
+export const kpiRing = (label:string, p:number | null, sub:string, color?:string) => `<div class="kpi ringed" style="--c:${color || progressColor(p)}">${ring(p, 50, color, label)}<div><span>${esc(label)}</span><small>${esc(sub)}</small></div></div>`;
+/** Large headline figure for the cleanliness page. */
+export const heroRate = (p:number | null, title:string, sub:string) => `<div class="hero" style="--c:${cleanColor(p)}">${ring(p, 78, cleanColor(p), title)}<div><span>${esc(title)}</span><b>${p == null ? '—' : pct(p)}</b><small>${esc(sub)}</small></div></div>`;
 
 /* ---------- printing ---------- */
 /** Prints a finished document. No external resources, so nothing can arrive late and break the layout. */
