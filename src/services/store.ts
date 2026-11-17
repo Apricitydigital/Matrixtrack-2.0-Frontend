@@ -1,4 +1,6 @@
 import { sortNewestFirst } from './sortReports';
+import { clearPersistedFilters, saveDateRange } from './persistedFilters';
+import { wardsLastAdministrative } from './wardAvailability';
 import {canonicalModuleKey} from './moduleKeys';
 import type { City, Zone, Ward, Area, Beat, User, OperationalReport, IecCleanlinessIssue, AttendanceRecord, PlantLog, AuditLogEvent, ActiveSession, Target, Capability, OperationalModuleId, ProductId, RoleType } from '../types';
 import { api, writeApi, clearToken, setToken, getToken, clearReadCache,getSessionVersion,setRefreshToken,revokeCurrentSession,setApiCityContext,setApiCityModules } from './api';
@@ -43,7 +45,7 @@ class MatrixStore {
   public getCityById(id: string) { return this.data.cities.find(c => c.id === id); }
   public getCityModules(id:string):{id:string;key:string;enabled:boolean}[]{return (this.rawCities.get(id)?.modules||[]).map((m:any)=>({id:m.moduleId||m.module?.id||m.id,key:canonicalModuleKey(m.key||m.module?.name||m.name),enabled:m.enabled!==false}));}
   public getZones(cityId?: string) { return this.data.zones.filter(z => !cityId || cityId === 'all' || z.cityId === cityId); }
-  public getWards(cityId?: string, zoneId?: string) { return this.data.wards.filter(w => (!cityId || cityId === 'all' || w.cityId === cityId) && (!zoneId || zoneId === 'all' || w.zoneId === zoneId)); }
+  public getWards(cityId?: string, zoneId?: string) { return wardsLastAdministrative(this.data.wards.filter(w => (!cityId || cityId === 'all' || w.cityId === cityId) && (!zoneId || zoneId === 'all' || w.zoneId === zoneId))); }
   public getBeats(cityId?: string, wardId?: string) { return this.data.beats.filter(b => (!cityId || cityId === 'all' || b.cityId === cityId) && (!wardId || wardId === 'all' || b.wardId === wardId)); }
   public getUsers(cityId?: string) { return this.data.users.filter(u => !u.isDeleted && (!cityId || cityId === 'all' || u.cityId === cityId)); }
   public getAllUsersWithTrash() { return this.data.users; }
@@ -87,6 +89,7 @@ class MatrixStore {
 
   public logout() {
     revokeCurrentSession();
+    clearPersistedFilters();
     sessionStorage.removeItem('matrixtrack_briefing_seen');sessionStorage.removeItem('matrixtrack_ulb_briefing_seen');
     clearToken(); this.generation++; this.workspace.cancel(); this.profile = null; this.currentUser = null;
     this.data = emptyData(); this.cleanlinessSummary = null; this.rawCities.clear(); this.loading = false; this.error = ''; this.warnings = []; this.notify();
@@ -195,7 +198,7 @@ class MatrixStore {
     // Reads are already keyed by dates, geography and session. Keep unexpired
     // results for return visits; refresh, mutations and sign-out still clear them.
     if(['CITY_ADMIN','COMMISSIONER','ULB_OFFICER'].includes(this.currentUser?.role||'')){this.workspace.changePeriod(from,to);this.loadRevision++;this.notify();return;}
-    this.workspace.from = from; this.workspace.to = to; await this.refresh();
+    this.workspace.from = from; this.workspace.to = to; saveDateRange(from, to); await this.refresh();
   }
 
   private cityScope(cityId?: string) {

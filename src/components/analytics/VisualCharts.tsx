@@ -239,20 +239,20 @@ export function AreaSeries({points, series, onSelect}:{points:{id:string;label:s
 }
 
 /* ---------- Status pie (replaces stacked status track) ---------- */
-export function StatusPie({items, label, loading, available, total, onSelect}:{items:{id:string;label:string;value:number | null | undefined;tone:keyof typeof STATUS_VIVID;attributes?:Record<string, string>;detail?:string}[];label:string;loading:boolean;available:boolean;total:number | null;onSelect?:(id:string) => void}) {
+export function StatusPie({items, label, loading, available, total, onSelect, extra}:{extra?:React.ReactNode;items:{id:string;label:string;value:number | null | undefined;tone:keyof typeof STATUS_VIVID;attributes?:Record<string, string>;detail?:string}[];label:string;loading:boolean;available:boolean;total:number | null;onSelect?:(id:string) => void}) {
   const ready = !loading && available;
   return <div className="viz-status" aria-label={label} aria-busy={loading}>
     {ready
       ? <PieChart items={items} label={label.length > 22 ? 'total records' : label} colors={items.map(i => STATUS_VIVID[i.tone])} legend={false}/>
       : <div className="viz-status-empty"><svg viewBox="0 0 220 220" aria-hidden="true"><circle cx="110" cy="110" r="75" fill="none" stroke="var(--viz-track)" strokeWidth="34" className={loading ? 'viz-pulse' : ''}/></svg><span>{loading ? 'Updating…' : 'Data unavailable'}</span></div>}
-    <div className="status-breakdown-legend viz-status-legend">{items.map(item => {
+    <div className="viz-status-side"><div className="status-breakdown-legend viz-status-legend">{items.map(item => {
       const share = ready && total ? (item.value || 0) / total * 100 : null;
       return <button key={item.id} {...item.attributes} data-tone={item.tone} disabled={!onSelect || !ready || item.value == null} onClick={() => onSelect?.(item.id)} title={item.detail || `${item.label}: ${ready ? amount(item.value, 0) : 'Unavailable'}`} aria-label={`${item.label}: ${ready ? amount(item.value, 0) : 'Unavailable'}. ${onSelect ? 'Open source records.' : ''}`}>
         <i style={{background: STATUS_VIVID[item.tone]}}/><span>{item.label}<small>{item.detail}</small></span><strong>{loading ? '…' : available ? amount(item.value, 0) : '—'}</strong><small>{share == null ? '' : `${amount(share, 1)}%`}</small>
         {share != null && <u className="viz-mini-track" aria-hidden="true"><u style={{width: `${Math.min(100, share)}%`, background: STATUS_VIVID[item.tone]}}/></u>}
         {onSelect && <ArrowUpRight size={14}/>}
       </button>;
-    })}</div>
+    })}</div>{extra}</div>
   </div>;
 }
 

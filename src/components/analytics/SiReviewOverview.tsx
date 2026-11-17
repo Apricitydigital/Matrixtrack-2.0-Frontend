@@ -5,7 +5,8 @@ import {useOperationalRefresh} from '../../services/useOperationalRefresh';
 import {siReviewPercent,siReviewSummary,type SiReviewRule} from '../../services/siReviewSummary';
 import {CardInfo} from '../common/CardInfo';
 
-export function SiReviewOverview({cityId,data,loading,zoneIds=[],wardIds=[],revision=0,rule,onPending}:{cityId:string;data:InspectionCoverage;loading:boolean;zoneIds?:string[];wardIds?:string[];revision?:number;rule?:SiReviewRule|null;onPending:()=>void}) {
+/** Saved SI review percentage for the selected area. Pass `rule` to skip the request. */
+export function useSiReviewRule(cityId:string,loading:boolean,zoneIds:string[]=[],wardIds:string[]=[],revision=0,rule?:SiReviewRule|null):SiReviewRule|null {
   const [loaded,setLoaded]=useState<{key:string;rule:SiReviewRule|null}>({key:'',rule:null});
   const liveRevision=useOperationalRefresh(cityId,rule===undefined&&!loading);
   const key=JSON.stringify([cityId,zoneIds,wardIds,revision]);
@@ -15,7 +16,11 @@ export function SiReviewOverview({cityId,data,loading,zoneIds=[],wardIds=[],revi
     api(`/city/targets/percent-scope?${new URLSearchParams({role:'QC',zoneIds:zoneIds.join(','),wardIds:wardIds.join(',')})}`,{signal:c.signal,headers:{'x-city-id':cityId},cache:'no-store'}).then(value=>{if(!c.signal.aborted)setLoaded({key,rule:value});}).catch(()=>{if(!c.signal.aborted)setLoaded({key,rule:null});});
     return()=>c.abort();
   },[key,rule,liveRevision]);
-  const current=rule!==undefined?rule:loaded.key===key?loaded.rule:null;
+  return rule!==undefined?rule:loaded.key===key?loaded.rule:null;
+}
+
+export function SiReviewOverview({cityId,data,loading,zoneIds=[],wardIds=[],revision=0,rule,onPending}:{cityId:string;data:InspectionCoverage;loading:boolean;zoneIds?:string[];wardIds?:string[];revision?:number;rule?:SiReviewRule|null;onPending:()=>void}) {
+  const current=useSiReviewRule(cityId,loading,zoneIds,wardIds,revision,rule);
   const percent=siReviewPercent(current),summary=siReviewSummary(data,percent);
   const count=(n:number|null)=>loading?'…':n==null?'—':n.toLocaleString('en-IN');
   return <section className="home-section"><div className="home-section-heading"><div><span>SI REVIEW</span><h2>SI review workload</h2></div><CardInfo title="SI target"><p>Submitted reports use the same dates, zones, wards and modules as Inspection target.</p><p>The target uses the SI percentage saved by ULB for the selected area. The date-range target sums the rounded percentage of reports submitted on each IST day. It is not multiplied by the number of SIs.</p><p>Officer queues and scores use each SI's assigned reports, saved review sets and older backlog. Those operational figures are separate from this submission-period comparison.</p></CardInfo></div><div className="ulb-si-body"><div className="ulb-followup-tiles">

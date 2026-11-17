@@ -1,4 +1,5 @@
 import {FOCUS_SCOPE,focusLabel,matchesZoneChoice,wardFocusPreset} from '../../services/wardFocusPreset';
+import { wardsLastAdministrative } from '../../services/wardAvailability';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowUpRight, Layers3, LoaderCircle, MapPin, RotateCcw, Search, ShieldCheck, Users, X } from 'lucide-react';
 import type { OperationalReport, User } from '../../types';
@@ -20,7 +21,7 @@ export function OperationalMap({reports,onSelectReport,selectedCityName,cityId,c
   const date=matrixStore.getDateRange().to,scope=cityId || currentUser.cityId || '';
   useEffect(()=>{const controller=new AbortController();setLoading(true);setError('');setData(null);setSelected('');setReportError('');const query=new URLSearchParams({date,cityId:scope,includeBoundaries:String(SHOW_OPERATIONAL_MAP_BOUNDARIES),includePersonnel:'true'});api(`/city/dashboard/operations-map?${query}`,{signal:controller.signal}).then(d=>{if(!controller.signal.aborted)setData(d);}).catch(e=>{if(!controller.signal.aborted)setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});return()=>controller.abort();},[scope,date,revision,matrixStore.loadRevision]);
   const assets=useMemo(()=>data?mapAssets(data):reports.map(r=>({key:r.id,id:r.assetId||r.id,module:r.moduleId,name:r.assetName,state:r.status,zoneId:r.zoneId,wardId:r.wardId,zoneName:'',wardName:matrixStore.getWards().find(w=>w.id===r.wardId)?.name || '',reportId:r.backendId,coordinates:r.coordinates,actors:[],supervisors:[],employees:[]} as MapAsset)),[data,reports]);
-  const zones=data?.filters?.zones || matrixStore.getZones(scope),wards=data?.filters?.wards || matrixStore.getWards(scope);
+  const zones=data?.filters?.zones || matrixStore.getZones(scope),wards=wardsLastAdministrative<any>(data?.filters?.wards || matrixStore.getWards(scope));
   const focus=useMemo(()=>wardFocusPreset(scope,matrixStore.getZones(scope),matrixStore.getWards(scope)),[scope,matrixStore.loadRevision]);
   const focusOn=zone===FOCUS_SCOPE&&!!focus,zoneFilter=focusOn?'':zone;
   const geographyAssets=useMemo(()=>assets.filter(a=>matchesZoneChoice(zone,focus,a.zoneId,a.wardId)&&(!ward||a.wardId===ward)),[assets,zone,ward,focus]);

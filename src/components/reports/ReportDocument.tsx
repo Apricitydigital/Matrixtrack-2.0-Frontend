@@ -1,6 +1,6 @@
 import {IntelligenceSuggestion} from './IntelligenceSuggestion';
 import { PhotoIntegrityWarning } from './PhotoIntegrityWarning';
-import React from 'react';
+import React, { useState } from 'react';
 import type { OperationalReport } from '../../types';
 import { ROLE_LABELS, MODULE_LABELS, statusLabel, statusTone } from '../../services/presentation';
 import { inspectionStatusLabel } from '../../services/inspectionStatus';
@@ -8,12 +8,15 @@ import { matrixStore } from '../../services/store';
 import { printHtml } from '../../services/print';
 import { AiCards } from './ReportAiPanel';
 import { ReportContacts } from './ReportContacts';
+import { ImageLightbox } from './ImageLightbox';
 export const formatDate = (value?: string) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : 'Not recorded';
 export function DecisionHistory({ report }: { report: OperationalReport }) {
-  return <div className="decision-grid">{['QC','ULB_OFFICER','ACTION_OFFICER'].map(role => {
+  const [photo,setPhoto]=useState<number|null>(null);
+  const corrective=report.photos.filter(p=>p.type==='corrective');
+  return <><div className="decision-grid">{['QC','ULB_OFFICER','ACTION_OFFICER'].map(role => {
     const d=report.decisions?.find(d=>d.role===role);
-    return <article key={role} data-tone={statusTone(d?.decision || "")} className={`decision-card ${d ? 'decision-recorded' : ''}`}><span>{ROLE_LABELS[role]}</span><h3>{d?.decision ? statusLabel(d.decision) : d ? 'Remarks recorded' : 'No decision recorded'}</h3><p>{d?.name || 'Name not recorded'}</p><small>{formatDate(d?.timestamp)}</small><blockquote>{d?.remarks || 'No remarks recorded.'}</blockquote>{role==='ACTION_OFFICER'&&<div className="action-evidence-gallery">{report.photos.filter(p=>p.type==='corrective').map((p,i)=><figure key={p.url}><a href={p.url} target="_blank" rel="noreferrer"><img loading="lazy" src={p.url} alt={p.caption||`IEC Action taken evidence ${i+1}`}/></a><figcaption>{p.caption||`IEC Action taken evidence ${i+1}`}<small>{formatDate(p.timestamp)}</small></figcaption></figure>)}</div>}</article>;
-  })}</div>;
+    return <article key={role} data-tone={statusTone(d?.decision || "")} className={`decision-card ${d ? 'decision-recorded' : ''}`}><span>{ROLE_LABELS[role]}</span><h3>{d?.decision ? statusLabel(d.decision) : d ? 'Remarks recorded' : 'No decision recorded'}</h3><p>{d?.name || 'Name not recorded'}</p><small>{formatDate(d?.timestamp)}</small><blockquote>{d?.remarks || 'No remarks recorded.'}</blockquote>{role==='ACTION_OFFICER'&&<div className="action-evidence-gallery">{report.photos.filter(p=>p.type==='corrective').map((p,i)=><figure key={p.url}><button type="button" className="evidence-photo-open" aria-label={`Open ${p.caption||`IEC Action taken evidence ${i+1}`}`} onClick={()=>setPhoto(i)}><img loading="lazy" src={p.url} alt={p.caption||`IEC Action taken evidence ${i+1}`}/></button><figcaption>{p.caption||`IEC Action taken evidence ${i+1}`}<small>{formatDate(p.timestamp)}</small></figcaption></figure>)}</div>}</article>;
+  })}</div><ImageLightbox isOpen={photo!==null} onClose={()=>setPhoto(null)} images={corrective} initialIndex={photo||0}/></>;
 }
 export function AiReview({ report }: { report: OperationalReport }) {
   return <AiCards report={report} role={matrixStore.currentUser?.role}/>;

@@ -1,4 +1,5 @@
 import React, { useId, useRef, useState } from 'react';
+import { isAdministrativeWard } from '../../services/wardAvailability';
 import { Check, ChevronDown } from 'lucide-react';
 import { useFilterDismiss } from './FilterPopover';
 
@@ -10,7 +11,9 @@ export function MultiSelectDropdown({ label, options, selected, onChange, allLab
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null);
   useFilterDismiss(root, reason => { setOpen(false); if (reason === 'escape') trigger.current?.focus(); }, open);
-  const sorted = [...new Map(options).entries()].sort((a, b) => a[1].localeCompare(b[1], undefined, { numeric: true, sensitivity: 'base' }));
+  // Natural order, except reconciliation buckets such as "Not Matched Employees" which always go last.
+  const byName = [...new Map(options).entries()].sort((a, b) => a[1].localeCompare(b[1], undefined, { numeric: true, sensitivity: 'base' }));
+  const sorted = [...byName.filter(([, name]) => isAdministrativeWard({ name })), ...byName.filter(([, name]) => !isAdministrativeWard({ name }))];
   const names = new Map(sorted);
   const chosen = selected.filter(key => names.has(key));
   const summary = chosen.length === 0 ? (allLabel || `All ${label.toLowerCase()}`) : chosen.length === 1 ? names.get(chosen[0])! : `${chosen.length} ${label.toLowerCase()} selected`;
