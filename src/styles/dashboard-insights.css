@@ -15,6 +15,16 @@
 .dp-section>header h3{margin:0;font-size:14px;font-weight:700;color:var(--ink)}
 .dp-section>header p{margin:2px 0 0;font-size:12px;color:var(--muted)}
 .dp-note{margin:0;font-size:12.5px;color:var(--muted);line-height:1.5}
+.attendance-day-chart-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface-soft);padding:12px 10px 9px}
+.attendance-day-chart{display:grid;align-items:end;gap:4px;height:142px}
+.attendance-day-chart__day{display:grid;grid-template-rows:1fr 15px;gap:5px;min-width:0;text-align:center}
+.attendance-day-chart__track{display:flex;align-items:end;justify-content:center;height:100%;border-radius:4px;background:var(--viz-track);overflow:hidden}
+.attendance-day-chart__stack{display:flex;flex-direction:column;justify-content:flex-end;width:100%;min-height:3px;border-radius:4px 4px 0 0;overflow:hidden}
+.attendance-day-chart__stack i{display:block;min-height:0}
+.attendance-day-chart__present{background:#20a879}.attendance-day-chart__absent{background:#e27b78}.attendance-day-chart__other{background:#9aa9b6}
+.attendance-day-chart__day small{font-size:9px;line-height:15px;color:var(--muted);font-variant-numeric:tabular-nums}
+.attendance-day-chart__legend{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 2px 0;font-size:11px;color:var(--muted)}
+.attendance-day-chart__legend span{display:flex;align-items:center;gap:5px}.attendance-day-chart__legend i{width:8px;height:8px;border-radius:2px;flex:0 0 8px}.attendance-day-chart__legend i.attendance-day-chart__missing{background:transparent;border:1px dashed #aebbc5;border-radius:2px}
 .dp-empty{margin:0;padding:14px;border:1px dashed var(--line);border-radius:10px;font-size:13px;color:var(--muted);text-align:center}
 .dp-split{display:grid;gap:8px}
 .dp-split-bar{display:flex;height:12px;border-radius:999px;overflow:hidden;background:var(--viz-track)}
