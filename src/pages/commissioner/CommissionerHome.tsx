@@ -126,10 +126,32 @@ export function CommissionerHome({city,zones,wards,reports,users=[],currentUser,
       <PanelSection title="By zone"><PanelTable head={['Zone','Target','Received','Still needed','Progress']} rows={zoneCards.map(c=>({key:c.id,cells:[c.name,fmtNum(c.target),fmtNum(c.completed),fmtNum(c.pending),fmtPct(c.percent)]}))}/></PanelSection>
       <PanelActions actions={[{label:'Open inspection register',primary:true,onClick:()=>onInspect()}]}/></>});
     if(kind==='coverage')openCoverage({});
-    if(kind==='attendance')panel.open({title:'Attendance',subtitle:scopeText,body:<>
-      <PanelStats items={[{label:'Attendance rate',value:attendance?.attendanceRate==null?'N/A':fmtPct(attendance.attendanceRate),tone:'blue'},{label:'Present',value:fmtNum(attendance?.present),tone:'green'},{label:'Absent',value:fmtNum(attendance?.absent),tone:'red'}]}/>
-      <p className="dp-note">Present attendance records divided by present plus absent records for the selected dates and area. Across several days the same employee appears once per day.{pulse.errors.attendance?` ${pulse.errors.attendance}`:''}</p>
-      <PanelActions actions={[{label:'Open attendance',primary:true,onClick:()=>onNavigate('comm_attendance')}]}/></>});
+    if(kind==='attendance'){
+      const days=Array.isArray(attendance?.dailyTrend)?attendance.dailyTrend as {date:string;total:number;present:number;absent:number}[]:[];
+      const byDate=new Map(days.map(day=>[day.date,day]));
+      const fromMs=Date.parse(`${range.from}T00:00:00Z`),toMs=Date.parse(`${range.to}T00:00:00Z`);
+      const calendarDays=Number.isFinite(fromMs)&&Number.isFinite(toMs)&&toMs>=fromMs?Math.floor((toMs-fromMs)/86400000)+1:days.length;
+      const chartDays=Number.isFinite(fromMs)&&calendarDays>0?Array.from({length:calendarDays},(_,index)=>{
+        const date=new Date(fromMs+index*86400000).toISOString().slice(0,10);
+        return {date,...(byDate.get(date)||{total:0,present:0,absent:0})};
+      }):days;
+      const daysWithData=Number(attendance?.daysWithData)||0;
+      const avgPresent=daysWithData>0&&Number.isFinite(Number(attendance?.present))?Number(attendance.present)/daysWithData:null;
+      const avgAbsent=daysWithData>0&&Number.isFinite(Number(attendance?.absent))?Number(attendance.absent)/daysWithData:null;
+      const chartPeak=Math.max(1,...chartDays.map(day=>Number(day.total)||0));
+      panel.open({title:'Attendance',subtitle:scopeText,body:<>
+        <PanelStats items={[{label:'Attendance rate',value:attendance?.attendanceRate==null?'N/A':fmtPct(attendance.attendanceRate),tone:'blue'},{label:'Present records',value:fmtNum(attendance?.present),tone:'green'},{label:'Absent records',value:fmtNum(attendance?.absent),tone:'red'},{label:'Days with attendance',value:attendance?.daysWithData==null?'N/A':fmtNum(attendance.daysWithData),note:`of ${calendarDays} selected`,tone:'blue'},{label:'Unique employees',value:fmtNum(attendance?.uniqueEmployees),note:'in this period',tone:'neutral'},{label:'Average per data day',value:avgPresent==null?'N/A':fmtNum(avgPresent,1),note:`present · ${avgAbsent==null?'N/A':fmtNum(avgAbsent,1)} absent`,tone:'neutral'}]}/>
+        <PanelSection title="Daily attendance" note="Each bar is one selected date. Empty columns mean no attendance records were received that day.">
+          {attendance&&chartDays.length>0?<div className="attendance-day-chart-scroll"><div className="attendance-day-chart" style={{gridTemplateColumns:`repeat(${chartDays.length}, minmax(18px, 1fr))`,minWidth:`max(100%, ${chartDays.length*22}px)`}} role="img" aria-label={`Daily attendance for ${daysWithData} of ${calendarDays} selected days`}>
+            {chartDays.map(day=>{const present=Number(day.present)||0,absent=Number(day.absent)||0,other=Math.max(0,(Number(day.total)||0)-present-absent);const dateLabel=new Date(`${day.date}T12:00:00Z`).toLocaleDateString('en-IN',{day:'numeric',month:'short',timeZone:'Asia/Kolkata'});return <div className="attendance-day-chart__day" key={day.date} title={`${dateLabel}: ${fmtNum(present)} present, ${fmtNum(absent)} absent${other?`, ${fmtNum(other)} other`:''}`}>
+              <div className="attendance-day-chart__track">{Number(day.total)>0&&<div className="attendance-day-chart__stack" style={{height:`${Math.max(3,(Number(day.total)||0)/chartPeak*100)}%`}}><i className="attendance-day-chart__present" style={{flex:present||0}}/><i className="attendance-day-chart__absent" style={{flex:absent||0}}/>{other>0&&<i className="attendance-day-chart__other" style={{flex:other}}/>}</div>}</div>
+              <small>{new Date(`${day.date}T12:00:00Z`).getUTCDate()}</small>
+            </div>;})}
+          </div><div className="attendance-day-chart__legend"><span><i className="attendance-day-chart__present"/>Present</span><span><i className="attendance-day-chart__absent"/>Absent</span><span><i className="attendance-day-chart__other"/>Other</span><span><i className="attendance-day-chart__missing"/>No data</span></div></div>:<p className="dp-empty">{attendance?'No attendance dates are available for this period.':'Attendance summary is loading or unavailable.'}</p>}
+        </PanelSection>
+        <p className="dp-note">Rate = present records ÷ present and absent records. Daily averages divide totals by days that had records. The same employee can appear once per day.{pulse.errors.attendance?` ${pulse.errors.attendance}`:''}</p>
+        <PanelActions actions={[{label:'Open attendance',primary:true,onClick:()=>onNavigate('comm_attendance')}]}/></>});
+    }
   };
   const openTeam=(role:string,label:string,progress:{completed:number|null;target:number|null;percent:number|null})=>{
     const people=advice.filter(a=>a.role===role&&a.severity!=='good'&&a.suggestions.length);

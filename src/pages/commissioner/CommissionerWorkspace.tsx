@@ -22,6 +22,7 @@ import { reportContacts } from '../../services/reportContacts';
 import { ReportContacts } from '../../components/reports/ReportContacts';
 import { useInspectionCoverage } from '../../services/useInspectionCoverage';
 import { wardInspectionRows, geographyOrder } from '../../services/wardInspections';
+import { SurveyReport } from './SurveyReport';
 
 export function officialZoneTotals(data: any) {
   const result={target:0,completed:0,pending:0,cleaned:0,notCleaned:0,siPending:0,actionRequired:0,actionPending:0,actionTaken:0};
@@ -37,9 +38,11 @@ export function CommissionerWorkspace({city,reports,zones,wards,users,onSelectRe
   const [photo,setPhoto]=useState<OperationalReport|null>(null);
   const range=matrixStore.getDateRange();
   const completeRegister=['COMMISSIONER','ULB_OFFICER'].includes(role);
-  const rawCoverage=useInspectionCoverage(city,range.from,range.to,matrixStore.loadRevision+retry,completeRegister);
+  const showSurveyReport=role==='CITY_ADMIN';
+  const rawCoverage=useInspectionCoverage(city,range.from,range.to,matrixStore.loadRevision+retry,completeRegister||showSurveyReport,role==='CITY_ADMIN');
   const coverage=useMemo(()=>({...rawCoverage,data:completeRegister?ulbReportRegister(rawCoverage.data):rawCoverage.data}),[rawCoverage.data,rawCoverage.loading,completeRegister]);
   const register=useMemo(()=>completeRegister?wardInspectionRows(coverage.data,city.id,undefined,zones,wards):reports,[completeRegister,coverage.data,city.id,zones,wards,reports]);
+  const surveyReportRows=useMemo(()=>wardInspectionRows(rawCoverage.data,city.id,undefined,zones,wards),[rawCoverage.data,city.id,zones,wards]);
   useEffect(()=>{setFilters({...emptyFilters(),...initialFilters});},[city.id,JSON.stringify(initialFilters)]);
   useEffect(()=>{if(matrixStore.getCollection('users').status==='idle')void matrixStore.loadCollection('users');},[city.id,matrixStore.loadRevision]);
   const rows=useMemo(()=>register.filter(r=>r.cityId===city.id && (completeRegister||r.inspectionDate>=range.from && r.inspectionDate<=range.to) && matchesFilters(r,filters,[r.assetName,r.reportNumber,r.submittedByName,r.reviewerName || ''])).sort((a,b)=>b.submittedAt.localeCompare(a.submittedAt)),[register,city.id,completeRegister,range.from,range.to,filters]);
@@ -58,6 +61,7 @@ export function CommissionerWorkspace({city,reports,zones,wards,users,onSelectRe
   return <div ref={container} className="commissioner-workspace space-y-5" data-role-dashboard={role}>
     <section className="commissioner-heading"><div><div className="commissioner-kicker"><ShieldCheck size={15}/>INSPECTION OVERSIGHT · {city.name}</div><h1>{title}</h1><p>{range.from} — {range.to} <span>Inspection evidence & decisions</span></p></div><div className="commissioner-actions no-print"><button disabled={Boolean(dataUnavailable)} onClick={()=>printElement(`${city.name} · Inspection Register`,container.current,`${range.from} to ${range.to} · Visible filtered view`)}><Printer size={15}/>Print register</button>{role==='COMMISSIONER'&&<button className="dark" onClick={()=>onNavigate?.('comm_exec_summary')}><FileText size={15}/>Reports & exports<ArrowUpRight size={13}/></button>}</div></section>{intro}{queueNavigation}
     <OperationalFilters value={filters} onChange={setFilters} zones={zones.filter(z=>z.cityId===city.id).sort(geographyOrder)} wards={wards.filter(w=>w.cityId===city.id).sort(geographyOrder)} users={users.filter(u=>u.cityId===city.id)} statuses={['all_actions_required','all_actions_taken','actions_outstanding','inspections_completed','pending_review','approved','rejected','escalated','unclassified']} moduleIds={moduleIds} staffOptions={staffOptions} statusLabels={statusLabels} resultCount={dataUnavailable?undefined:rows.length}/>
+    {showSurveyReport&&<SurveyReport city={city} wards={wards} assets={coverage.data.assets} reports={surveyReportRows} from={range.from} to={range.to} inventoryAvailable={coverage.data.inventoryAvailable} failedModules={coverage.data.failedModules} loading={coverage.loading}/>}
     {activeFilters.length>0&&<p className="chart-footnote">Filtered register: {activeFilters.join(" / ")}. <button className="underline" onClick={()=>setFilters(emptyFilters())}>View all reports for selected dates</button></p>}
     {role==='ULB_OFFICER'&&!filters.moduleIds.length&&filters.moduleId==='all'&&<InspectionTargetStrip city={city} zones={zones} coverage={coverage.data} loading={coverage.loading} from={range.from} to={range.to} zoneIds={selectedZoneIds(filters)} wardIds={selectedWardIds(filters)} revision={matrixStore.loadRevision+retry} onInspect={()=>setFilters({...filters,status:'inspections_completed',ryg:'all'})}/>}
     <IntelligenceSummary reports={register.filter(r=>r.cityId===city.id&&matchesFilters(r,{...filters,status:'all'},[r.assetName,r.reportNumber,r.submittedByName,r.reviewerName||'']))} loading={coverage.loading&&completeRegister} unavailable={!!dataUnavailable&&!coverage.loading} onSelect={status=>setFilters({...filters,status,ryg:'all'})}/>
